@@ -9,7 +9,7 @@ import { Settings } from '../ui/admin/Settings';
 import { SystemStatus } from './SystemStatus';
 import { WhatsAppConnection, AIConfiguration as AIConfig, MenuTemplate, Campaign, Lead } from '../../types/kohl-system';
 import { defaultMenuTemplate, kohlFAQs } from '../../data/kohl-courses';
-import { WhatsAppWebSession } from '../../integrations/whatsapp/webSession';
+import { startSession as startWebSession } from '../../integrations/whatsapp/webSession';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
 
@@ -152,18 +152,12 @@ export function KohlDashboard() {
       ));
 
       if (connection.connectionType === 'web') {
-        const webSession = new WhatsAppWebSession(id, connection);
-        await webSession.startSession();
-        await logger.info('qr_generated', `QR code gerado para conexão ${connection.name}`, { id });
-
-        setTimeout(async () => {
-          setConnections(prev => prev.map(conn =>
-            conn.id === id
-              ? { ...conn, status: 'connected', lastActivity: new Date().toISOString(), messageCount: conn.messageCount + 1 }
-              : conn
-          ));
-          await logger.info('session_connected', `Sessão conectada para ${connection.name}`, { id });
-        }, 8000);
+        const res = await startWebSession(id);
+        if (res.ok) {
+          await logger.info('qr_generated', `Sessao web iniciada para conexão ${connection.name}`, { id });
+        } else {
+          await logger.info('session_start_failed', `Falha ao iniciar sessao web: ${res.error}`, { id });
+        }
 
       } else if (connection.connectionType === 'api') {
         await logger.info('api_validate', `Iniciando validação Business API para ${connection.name}`, { id });

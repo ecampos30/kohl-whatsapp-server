@@ -14,6 +14,49 @@ function jsonResponse(data: unknown, status = 200) {
   });
 }
 
+function getBaileysUrl(): string {
+  return (Deno.env.get("BAILEYS_SERVER_URL") ?? "").replace(/\/$/, "");
+}
+
+function getBaileysSecret(): string {
+  return Deno.env.get("BAILEYS_API_SECRET") ?? "";
+}
+
+function baileysHeaders(): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${getBaileysSecret()}`,
+  };
+}
+
+async function baileysPost(path: string, body: Record<string, unknown>) {
+  const url = `${getBaileysUrl()}${path}`;
+  return fetch(url, {
+    method: "POST",
+    headers: baileysHeaders(),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+}
+
+async function baileysGet(path: string) {
+  const url = `${getBaileysUrl()}${path}`;
+  return fetch(url, {
+    method: "GET",
+    headers: baileysHeaders(),
+    signal: AbortSignal.timeout(10000),
+  });
+}
+
+async function baileysDelete(path: string) {
+  const url = `${getBaileysUrl()}${path}`;
+  return fetch(url, {
+    method: "DELETE",
+    headers: baileysHeaders(),
+    signal: AbortSignal.timeout(10000),
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -29,8 +72,6 @@ Deno.serve(async (req: Request) => {
     const action = url.pathname.split("/").pop();
 
     // ── POST /whatsapp-session/healthcheck ─────────────────────────────────
-    // Verifica se as credenciais da Business API são válidas chamando o endpoint real da Meta.
-    // Para conexões tipo "web", retorna erro explicativo sobre requisito de backend externo.
     if (req.method === "POST" && action === "healthcheck") {
       const { connection_id, client_id } = await req.json();
 
@@ -55,14 +96,14 @@ Deno.serve(async (req: Request) => {
           client_id: effectiveClientId,
           level: "WARN",
           event_type: "healthcheck_web_unsupported",
-          message: `Healthcheck solicitado para conexão web (QR) ${connection_id} — não suportado neste ambiente`,
+          message: `Healthcheck solicitado para conexão web (QR) ${connection_id} — use web-status`,
           payload: { connection_id },
         });
 
         return jsonResponse({
           ok: false,
-          code: "WEB_REQUIRES_EXTERNAL_BACKEND",
-          error: "Conexão tipo Web QR requer servidor Node.js externo com Baileys. Não é possível verificar via Edge Function.",
+          code: "USE_WEB_STATUS",
+          error: "Para conexões web, use o endpoint web-status.",
           connection_type: "web",
         });
       }
@@ -165,7 +206,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── POST /whatsapp-session/test-send ──────────────────────────────────
-    // Envia uma mensagem de teste real via Business API para provar que o envio funciona.
     if (req.method === "POST" && action === "test-send") {
       const { connection_id, client_id, test_phone } = await req.json();
 
@@ -188,8 +228,8 @@ Deno.serve(async (req: Request) => {
       if (conn.connection_type !== "api_oficial") {
         return jsonResponse({
           ok: false,
-          code: "WEB_REQUIRES_EXTERNAL_BACKEND",
-          error: "Envio de teste requer conexão tipo Business API.",
+          code: "USE_WEB_SEND",
+          error: "Para conexões web, use o endpoint web-send.",
         });
       }
 
@@ -296,7 +336,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── POST /whatsapp-session/reset ───────────────────────────────────────
-    // Redefine o status de uma conexão para "disconnected" e limpa o qr_code.
     if (req.method === "POST" && action === "reset") {
       const { connection_id, client_id } = await req.json();
 
@@ -326,6 +365,226 @@ Deno.serve(async (req: Request) => {
         level: "INFO",
         event_type: "session_reset",
         message: `Sessão reiniciada manualmente para conexão ${connection_id}`,
+        payload: { connection_id },
+      });
+
+      return jsonResponse({ ok: true, status: "disconnected" });
+    }
+
+    // ── POST /whatsapp-session/web-start ──────────────────────────────────
+    // Inicia uma sessão Baileys no servidor EC2.
+    if (req.method === "POST" && action === "web-start") {
+      const { connection_id, client_id } = await req.json();
+
+      if (!connection_id) {
+        return jsonResponse({ error: "Missing connection_id" }, 400);
+      }
+
+      const { data: conn } = await supabase
+        .from("whatsapp_connections")
+        .select("client_id, connection_type")
+        .eq("id", connection_id)
+        .maybeSingle();
+
+      const effectiveClientId = client_id ?? conn?.client_id ?? null;
+
+      if (!getBaileysUrl()) {
+        return jsonResponse({ ok: false, code: "NOT_CONFIGURED", error: "BAILEYS_SERVER_URL não configurado." });
+      }
+
+      try {
+        const res = await baileysPost("/session/start", { connectionId: connection_id });
+        const body = await res.json().catch(() => ({}));
+
+        await supabase
+          .from("whatsapp_connections")
+          .update({ status: "scanning", last_activity: new Date().toISOString() })
+          .eq("id", connection_id);
+
+        await supabase.from("system_logs").insert({
+          client_id: effectiveClientId,
+          level: "INFO",
+          event_type: "web_session_started",
+          message: `Sessão web iniciada para conexão ${connection_id}`,
+          payload: { connection_id, baileys_response: body },
+        });
+
+        return jsonResponse({ ok: true, status: "scanning", ...body });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return jsonResponse({ ok: false, code: "BAILEYS_ERROR", error: msg });
+      }
+    }
+
+    // ── GET /whatsapp-session/web-status ──────────────────────────────────
+    // Consulta o status de uma sessão no servidor EC2 e sincroniza com Supabase.
+    if (req.method === "GET" && action === "web-status") {
+      const connectionId = url.searchParams.get("connection_id");
+
+      if (!connectionId) {
+        return jsonResponse({ error: "Missing connection_id" }, 400);
+      }
+
+      if (!getBaileysUrl()) {
+        return jsonResponse({ ok: false, code: "NOT_CONFIGURED", error: "BAILEYS_SERVER_URL não configurado." });
+      }
+
+      try {
+        const res = await baileysGet(`/session/${connectionId}/status`);
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+
+        const baileysStatus = (body.status as string) ?? "disconnected";
+        const mappedStatus =
+          baileysStatus === "open" || baileysStatus === "connected" ? "connected"
+          : baileysStatus === "scanning" ? "scanning"
+          : "disconnected";
+
+        await supabase
+          .from("whatsapp_connections")
+          .update({ status: mappedStatus, last_activity: new Date().toISOString() })
+          .eq("id", connectionId);
+
+        return jsonResponse({ ok: true, status: mappedStatus, raw: body });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return jsonResponse({ ok: false, code: "BAILEYS_ERROR", error: msg });
+      }
+    }
+
+    // ── GET /whatsapp-session/web-qr ──────────────────────────────────────
+    // Busca o QR code atual da sessão no servidor EC2.
+    if (req.method === "GET" && action === "web-qr") {
+      const connectionId = url.searchParams.get("connection_id");
+
+      if (!connectionId) {
+        return jsonResponse({ error: "Missing connection_id" }, 400);
+      }
+
+      if (!getBaileysUrl()) {
+        return jsonResponse({ ok: false, code: "NOT_CONFIGURED", error: "BAILEYS_SERVER_URL não configurado." });
+      }
+
+      try {
+        const res = await baileysGet(`/session/${connectionId}/qr`);
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+
+        const qr = (body.qr as string) ?? null;
+
+        if (qr) {
+          await supabase
+            .from("whatsapp_connections")
+            .update({ qr_code: qr, status: "scanning", last_activity: new Date().toISOString() })
+            .eq("id", connectionId);
+        }
+
+        return jsonResponse({ ok: !!qr, qr, raw: body });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return jsonResponse({ ok: false, code: "BAILEYS_ERROR", error: msg });
+      }
+    }
+
+    // ── POST /whatsapp-session/web-send ───────────────────────────────────
+    // Envia uma mensagem via servidor EC2 (conexão web/Baileys).
+    if (req.method === "POST" && action === "web-send") {
+      const { connection_id, client_id, number, message } = await req.json();
+
+      if (!connection_id || !number || !message) {
+        return jsonResponse({ error: "Missing connection_id, number or message" }, 400);
+      }
+
+      const { data: conn } = await supabase
+        .from("whatsapp_connections")
+        .select("client_id, connection_type, status")
+        .eq("id", connection_id)
+        .maybeSingle();
+
+      const effectiveClientId = client_id ?? conn?.client_id ?? null;
+
+      if (!getBaileysUrl()) {
+        return jsonResponse({ ok: false, code: "NOT_CONFIGURED", error: "BAILEYS_SERVER_URL não configurado." });
+      }
+
+      try {
+        const res = await baileysPost(`/session/${connection_id}/send`, { number, message });
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+        const isOk = res.status >= 200 && res.status < 300;
+
+        await supabase.from("system_logs").insert({
+          client_id: effectiveClientId,
+          level: isOk ? "INFO" : "ERROR",
+          event_type: isOk ? "web_send_success" : "web_send_failed",
+          message: isOk
+            ? `[web_send] Mensagem enviada para ${number} via conexão ${connection_id}`
+            : `[web_send] FALHOU ao enviar para ${number} — HTTP ${res.status}`,
+          payload: { connection_id, number, http_status: res.status, response: body },
+        });
+
+        if (isOk) {
+          await supabase.from("messages").insert({
+            connection_id,
+            client_id: effectiveClientId,
+            direction: "outbound",
+            from_number: connection_id,
+            to_number: number,
+            body: message,
+            ai_response: false,
+            processed: true,
+            processed_at: new Date().toISOString(),
+            external_message_id: (body.messageId as string) ?? `web-${Date.now()}`,
+          });
+
+          return jsonResponse({ ok: true, message: `Mensagem enviada para ${number}.`, ...body });
+        }
+
+        return jsonResponse({
+          ok: false,
+          code: "SEND_ERROR",
+          error: (body.error as string) ?? `HTTP ${res.status}`,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return jsonResponse({ ok: false, code: "BAILEYS_ERROR", error: msg });
+      }
+    }
+
+    // ── POST /whatsapp-session/web-delete ─────────────────────────────────
+    // Encerra e remove uma sessão do servidor EC2.
+    if (req.method === "POST" && action === "web-delete") {
+      const { connection_id, client_id } = await req.json();
+
+      if (!connection_id) {
+        return jsonResponse({ error: "Missing connection_id" }, 400);
+      }
+
+      const { data: conn } = await supabase
+        .from("whatsapp_connections")
+        .select("client_id")
+        .eq("id", connection_id)
+        .maybeSingle();
+
+      const effectiveClientId = client_id ?? conn?.client_id ?? null;
+
+      if (!getBaileysUrl()) {
+        return jsonResponse({ ok: false, code: "NOT_CONFIGURED", error: "BAILEYS_SERVER_URL não configurado." });
+      }
+
+      try {
+        await baileysDelete(`/session/${connection_id}`);
+      } catch {
+        // best effort — proceed to update DB regardless
+      }
+
+      await supabase
+        .from("whatsapp_connections")
+        .update({ status: "disconnected", qr_code: null, last_activity: new Date().toISOString() })
+        .eq("id", connection_id);
+
+      await supabase.from("system_logs").insert({
+        client_id: effectiveClientId,
+        level: "INFO",
+        event_type: "web_session_deleted",
+        message: `Sessão web encerrada para conexão ${connection_id}`,
         payload: { connection_id },
       });
 

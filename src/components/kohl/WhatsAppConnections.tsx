@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Plus, Smartphone, Wifi, WifiOff, QrCode, Settings, Trash2, Key, Globe,
   AlertTriangle, CheckCircle, PauseCircle, PlayCircle, RefreshCw,
-  FlaskConical, ChevronDown, ChevronUp, Clock, Server, X,
+  FlaskConical, ChevronDown, ChevronUp, Clock, Server, X, Power, Send,
 } from 'lucide-react';
+import { startSession, deleteSession, sendSessionMessage } from '../../integrations/whatsapp/webSession';
 import { WhatsAppConnection } from '../../types/kohl-system';
 import { QRCodeDisplay } from './QRCodeDisplay';
 import { supabase } from '../../lib/supabase';
@@ -58,6 +59,10 @@ export function WhatsAppConnections({
   const [testSendLoading, setTestSendLoading] = useState<Set<string>>(new Set());
   const [testSendResults, setTestSendResults] = useState<Record<string, HealthResult>>({});
   const [resetLoading, setResetLoading] = useState<Set<string>>(new Set());
+  const [webStartLoading, setWebStartLoading] = useState<Set<string>>(new Set());
+  const [webDeleteLoading, setWebDeleteLoading] = useState<Set<string>>(new Set());
+  const [webSendLoading, setWebSendLoading] = useState<Set<string>>(new Set());
+  const [webResults, setWebResults] = useState<Record<string, HealthResult>>({});
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
   const [connectionLogs, setConnectionLogs] = useState<Record<string, SystemLog[]>>({});
   const [logsLoading, setLogsLoading] = useState<Set<string>>(new Set());
@@ -167,6 +172,54 @@ export function WhatsAppConnections({
     setResetLoading(prev => { const s = new Set(prev); s.delete(connectionId); return s; });
   };
 
+  const handleWebStart = async (connectionId: string) => {
+    setWebStartLoading(prev => new Set(prev).add(connectionId));
+    setWebResults(prev => ({ ...prev, [connectionId]: undefined as unknown as HealthResult }));
+    const res = await startSession(connectionId);
+    setWebResults(prev => ({
+      ...prev,
+      [connectionId]: {
+        ok: res.ok,
+        message: res.ok ? 'Sessao iniciada. Clique em "Ver QR" para escanear.' : undefined,
+        error: res.error,
+        code: res.code,
+      },
+    }));
+    setWebStartLoading(prev => { const s = new Set(prev); s.delete(connectionId); return s; });
+    if (res.ok) setShowQRCode(connectionId);
+  };
+
+  const handleWebDelete = async (connectionId: string) => {
+    setWebDeleteLoading(prev => new Set(prev).add(connectionId));
+    setWebResults(prev => ({ ...prev, [connectionId]: undefined as unknown as HealthResult }));
+    const res = await deleteSession(connectionId);
+    setWebResults(prev => ({
+      ...prev,
+      [connectionId]: {
+        ok: res.ok,
+        message: res.ok ? 'Sessao encerrada com sucesso.' : undefined,
+        error: res.error,
+      },
+    }));
+    setWebDeleteLoading(prev => { const s = new Set(prev); s.delete(connectionId); return s; });
+  };
+
+  const handleWebSend = async (connectionId: string, number: string) => {
+    if (!number) return;
+    setWebSendLoading(prev => new Set(prev).add(connectionId));
+    setWebResults(prev => ({ ...prev, [connectionId]: undefined as unknown as HealthResult }));
+    const res = await sendSessionMessage(connectionId, number, '[TESTE KOHL] Mensagem de teste via WhatsApp Web / Baileys.');
+    setWebResults(prev => ({
+      ...prev,
+      [connectionId]: {
+        ok: res.ok,
+        message: res.ok ? `Mensagem enviada para ${number}.` : undefined,
+        error: res.error,
+      },
+    }));
+    setWebSendLoading(prev => { const s = new Set(prev); s.delete(connectionId); return s; });
+  };
+
   const loadLogs = useCallback(async (connectionId: string) => {
     setLogsLoading(prev => new Set(prev).add(connectionId));
     const { data } = await supabase
@@ -254,10 +307,8 @@ export function WhatsAppConnections({
         <div className="text-sm">
           <p className="font-medium text-blue-900">Sobre os tipos de conexão</p>
           <p className="text-blue-800 mt-1">
-            <strong>Business API</strong> — funciona completamente neste ambiente (Edge Function + webhook Meta).
-            O status "Conectado\" é definido somente após verificação real da API da Meta.{' '}
-            <strong>Web QR</strong> — requer servidor Node.js externo com Baileys 24/7. O QR exibido aqui
-            não pode ser escaneado sem esse backend; o status não será marcado como "Conectado\" automaticamente.
+            <strong>Business API</strong> — usa credenciais Meta, healthcheck e envio via API oficial.{' '}
+            <strong>Web QR</strong> — conecta via servidor Baileys (EC2). Inicie a sessao, escaneie o QR e o status atualiza automaticamente.
           </p>
         </div>
       </div>
@@ -319,16 +370,6 @@ export function WhatsAppConnections({
                   </span>
                 </div>
 
-                {/* Web QR warning */}
-                {!isApi && (
-                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start space-x-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-amber-800">
-                      Conexão QR inativa neste ambiente. Requer servidor Baileys externo.
-                      O status "Conectado" só será marcado quando o backend externo enviar <code>state=open</code>.
-                    </p>
-                  </div>
-                )}
 
                 {/* Stats */}
                 <div className="mt-4 flex items-center space-x-4 text-xs text-gray-500">
@@ -425,13 +466,75 @@ export function WhatsAppConnections({
 
                 {/* Web QR actions */}
                 {!isApi && (
-                  <button
-                    onClick={() => setShowQRCode(connection.id)}
-                    className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100 transition-colors"
-                  >
-                    <QrCode className="h-3.5 w-3.5" />
-                    <span>Informações sobre conexão QR</span>
-                  </button>
+                  <>
+                    {/* Start session */}
+                    {(connection.status === 'disconnected' || connection.status === 'error') && (
+                      <button
+                        onClick={() => handleWebStart(connection.id)}
+                        disabled={webStartLoading.has(connection.id)}
+                        className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
+                      >
+                        {webStartLoading.has(connection.id)
+                          ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /><span>Iniciando sessao...</span></>
+                          : <><Power className="h-3.5 w-3.5" /><span>Iniciar sessao</span></>}
+                      </button>
+                    )}
+
+                    {/* View QR */}
+                    {(connection.status === 'scanning' || connection.status === 'connected') && (
+                      <button
+                        onClick={() => setShowQRCode(connection.id)}
+                        className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium bg-gray-900 hover:bg-gray-700 text-white transition-colors"
+                      >
+                        <QrCode className="h-3.5 w-3.5" />
+                        <span>Ver QR Code</span>
+                      </button>
+                    )}
+
+                    {/* Test send */}
+                    {connection.status === 'connected' && (
+                      <button
+                        onClick={() => {
+                          const num = window.prompt('Numero de destino (ex: 5511999999999):');
+                          if (num) handleWebSend(connection.id, num.trim());
+                        }}
+                        disabled={webSendLoading.has(connection.id)}
+                        className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100 transition-colors disabled:opacity-50"
+                      >
+                        {webSendLoading.has(connection.id)
+                          ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /><span>Enviando...</span></>
+                          : <><Send className="h-3.5 w-3.5" /><span>Enviar mensagem de teste</span></>}
+                      </button>
+                    )}
+
+                    {/* Disconnect */}
+                    {connection.status !== 'disconnected' && (
+                      <button
+                        onClick={() => handleWebDelete(connection.id)}
+                        disabled={webDeleteLoading.has(connection.id)}
+                        className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 transition-colors disabled:opacity-50"
+                      >
+                        {webDeleteLoading.has(connection.id)
+                          ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /><span>Desconectando...</span></>
+                          : <><WifiOff className="h-3.5 w-3.5" /><span>Desconectar</span></>}
+                      </button>
+                    )}
+
+                    {/* Web action result */}
+                    {webResults[connection.id] && (
+                      <div className={`rounded-lg px-3 py-2 text-xs border ${webResults[connection.id].ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                        <div className="flex items-start space-x-1.5">
+                          {webResults[connection.id].ok
+                            ? <CheckCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                            : <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />}
+                          <span>{webResults[connection.id].ok ? webResults[connection.id].message : webResults[connection.id].error}</span>
+                        </div>
+                        {webResults[connection.id].code && (
+                          <p className="mt-1 opacity-70">{webResults[connection.id].code}</p>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Reset session */}

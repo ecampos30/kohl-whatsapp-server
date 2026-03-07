@@ -1,5 +1,6 @@
-import React from 'react';
-import { X, AlertTriangle, Server, Key } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, RefreshCw, CheckCircle, AlertTriangle, QrCode, Wifi } from 'lucide-react';
+import { getSessionQr, getSessionStatus } from '../../integrations/whatsapp/webSession';
 
 interface QRCodeDisplayProps {
   connectionId: string;
@@ -7,81 +8,172 @@ interface QRCodeDisplayProps {
   onConnectionSuccess: (connectionId: string) => void;
 }
 
-export function QRCodeDisplay({ onClose }: QRCodeDisplayProps) {
+type Phase = 'loading' | 'scanning' | 'connected' | 'error';
+
+export function QRCodeDisplay({ connectionId, onClose, onConnectionSuccess }: QRCodeDisplayProps) {
+  const [phase, setPhase] = useState<Phase>('loading');
+  const [qrImage, setQrImage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string>('');
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stoppedRef = useRef(false);
+
+  const stopPolling = useCallback(() => {
+    stoppedRef.current = true;
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const poll = useCallback(async () => {
+    if (stoppedRef.current) return;
+
+    const statusRes = await getSessionStatus(connectionId);
+
+    if (statusRes.status === 'connected') {
+      stopPolling();
+      setPhase('connected');
+      setTimeout(() => {
+        onConnectionSuccess(connectionId);
+        onClose();
+      }, 2000);
+      return;
+    }
+
+    if (statusRes.status === 'scanning' || !statusRes.status) {
+      const qrRes = await getSessionQr(connectionId);
+      if (qrRes.qr) {
+        setQrImage(qrRes.qr);
+        setPhase('scanning');
+      } else if (phase === 'loading') {
+        setPhase('scanning');
+      }
+    }
+
+    if (statusRes.status === 'disconnected' || statusRes.status === 'error') {
+      if (!qrImage) {
+        stopPolling();
+        setPhase('error');
+        setErrorMsg(statusRes.error ?? 'Sessao encerrada ou erro no servidor Baileys.');
+      }
+    }
+  }, [connectionId, onClose, onConnectionSuccess, phase, qrImage, stopPolling]);
+
+  useEffect(() => {
+    stoppedRef.current = false;
+    poll();
+    intervalRef.current = setInterval(poll, 4000);
+    return () => stopPolling();
+  }, []);
+
+  const handleClose = () => {
+    stopPolling();
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-6 w-full max-w-lg">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">WhatsApp Web QR</h2>
-            <p className="text-gray-500 text-sm">Conexão via QR Code</p>
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center space-x-2">
+            <QrCode className="h-5 w-5 text-gray-700" />
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Escanear QR Code</h2>
+              <p className="text-xs text-gray-400">WhatsApp Web — Baileys</p>
+            </div>
           </div>
           <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-700 transition-colors rounded-lg hover:bg-gray-100"
+            onClick={handleClose}
+            className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start space-x-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="font-medium text-amber-900 text-sm">Conexão QR requer backend Node.js externo</p>
-              <p className="text-amber-800 text-sm mt-1">
-                O WhatsApp Web QR Code funciona apenas quando existe um servidor Node.js 24/7 rodando
-                a biblioteca <strong>Baileys</strong> ou <strong>whatsapp-web.js</strong>. Este painel
-                roda em ambiente serverless (Edge Functions) que não suporta WebSockets persistentes
-                necessários para a sessão WhatsApp Web.
-              </p>
+        <div className="p-5 flex flex-col items-center space-y-4">
+          {phase === 'loading' && (
+            <div className="flex flex-col items-center space-y-3 py-8">
+              <RefreshCw className="h-8 w-8 text-gray-400 animate-spin" />
+              <p className="text-sm text-gray-500">Buscando QR no servidor...</p>
             </div>
-          </div>
+          )}
 
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <Server className="h-5 w-5 text-gray-600" />
-              <span className="font-medium text-gray-900 text-sm">O que é necessário para QR funcionar:</span>
-            </div>
-            <ol className="text-sm text-gray-700 space-y-2">
-              <li className="flex items-start space-x-2">
-                <span className="bg-gray-200 text-gray-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</span>
-                <span>Um servidor VPS/servidor dedicado rodando Node.js 24/7</span>
-              </li>
-              <li className="flex items-start space-x-2">
-                <span className="bg-gray-200 text-gray-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
-                <span>Biblioteca Baileys instalada: <code className="bg-gray-100 px-1 rounded">npm install @whiskeysockets/baileys</code></span>
-              </li>
-              <li className="flex items-start space-x-2">
-                <span className="bg-gray-200 text-gray-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>
-                <span>Endpoints REST expostos para este painel consumir (QR, status, sendMessage)</span>
-              </li>
-              <li className="flex items-start space-x-2">
-                <span className="bg-gray-200 text-gray-800 rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">4</span>
-                <span>O status "connected" só pode ser marcado quando o socket emite <code className="bg-gray-100 px-1 rounded">state: "open"</code></span>
-              </li>
-            </ol>
-          </div>
+          {phase === 'scanning' && (
+            <>
+              {qrImage ? (
+                <div className="border-4 border-gray-900 rounded-xl p-2 bg-white">
+                  <img
+                    src={qrImage}
+                    alt="QR Code WhatsApp"
+                    className="w-56 h-56 object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="w-64 h-64 flex items-center justify-center bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                  <RefreshCw className="h-6 w-6 text-gray-400 animate-spin" />
+                </div>
+              )}
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start space-x-3">
-            <Key className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="font-medium text-blue-900 text-sm">Alternativa recomendada: WhatsApp Business API</p>
-              <p className="text-blue-800 text-sm mt-1">
-                Configure uma conexão do tipo <strong>"Business API"</strong> usando suas credenciais do
-                Meta Business Manager. Funciona completamente neste ambiente — sem servidor externo,
-                sem QR Code, mais estável e com suporte a templates e botões interativos.
-              </p>
+              <div className="text-center space-y-1">
+                <p className="text-sm font-medium text-gray-800">Abra o WhatsApp no celular</p>
+                <p className="text-xs text-gray-500">Menu → Dispositivos conectados → Conectar dispositivo</p>
+              </div>
+
+              <div className="flex items-center space-x-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 w-full justify-center">
+                <RefreshCw className="h-3 w-3 animate-spin flex-shrink-0" />
+                <span>Verificando status a cada 4 segundos...</span>
+              </div>
+            </>
+          )}
+
+          {phase === 'connected' && (
+            <div className="flex flex-col items-center space-y-3 py-8">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="h-8 w-8 text-emerald-600" />
+              </div>
+              <div className="text-center">
+                <p className="font-semibold text-gray-900">Conectado com sucesso!</p>
+                <p className="text-sm text-gray-500 mt-1">WhatsApp Web ativo. Fechando...</p>
+              </div>
+              <div className="flex items-center space-x-1.5 text-xs text-emerald-700">
+                <Wifi className="h-3.5 w-3.5" />
+                <span>Sessao Baileys ativa</span>
+              </div>
             </div>
-          </div>
+          )}
+
+          {phase === 'error' && (
+            <div className="flex flex-col items-center space-y-3 py-8">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
+                <AlertTriangle className="h-8 w-8 text-red-500" />
+              </div>
+              <div className="text-center">
+                <p className="font-semibold text-gray-900">Nao foi possivel obter o QR</p>
+                <p className="text-xs text-gray-500 mt-1 max-w-xs">{errorMsg}</p>
+              </div>
+              <button
+                onClick={() => {
+                  stoppedRef.current = false;
+                  setPhase('loading');
+                  setErrorMsg('');
+                  poll();
+                  intervalRef.current = setInterval(poll, 4000);
+                }}
+                className="flex items-center space-x-1.5 text-sm text-blue-600 hover:underline"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>Tentar novamente</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="flex justify-end pt-4 mt-2 border-t border-gray-100">
+        <div className="px-5 pb-4 flex justify-end border-t border-gray-100 pt-3">
           <button
-            onClick={onClose}
-            className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+            onClick={handleClose}
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
-            Entendido
+            Fechar
           </button>
         </div>
       </div>
