@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
-import { Save, Shield, Clock, Bell, Database, Webhook, Key, Globe, QrCode } from 'lucide-react';
+import { Save, Shield, Clock, Bell, Database, Webhook, Key, Globe, QrCode, Smartphone } from 'lucide-react';
 import { WhatsAppConnectionConfig } from '../../config/connections';
+import { SessionSelector } from '../../kohl/SessionSelector';
+import { WhatsAppConnection } from '../../types/kohl-system';
 
 interface SettingsProps {
   connections: WhatsAppConnectionConfig[];
   onSave: (connections: WhatsAppConnectionConfig[]) => void;
+  kohlConnections?: WhatsAppConnection[];
+  selectedConnectionId?: string;
+  onSelectConnection?: (id: string) => void;
 }
 
-export function Settings({ connections, onSave }: SettingsProps) {
-  const [activeTab, setActiveTab] = useState('whatsapp');
+export function Settings({ connections, onSave, kohlConnections, selectedConnectionId, onSelectConnection }: SettingsProps) {
+  const [activeTab, setActiveTab] = useState(kohlConnections ? 'session' : 'whatsapp');
   const [settings, setSettings] = useState({
     whatsapp: {
       fallbackMode: 'auto_fallback' as 'web_only' | 'api_only' | 'auto_fallback',
@@ -54,6 +59,7 @@ export function Settings({ connections, onSave }: SettingsProps) {
   });
 
   const tabs = [
+    ...(kohlConnections ? [{ id: 'session', label: 'Sessao Ativa', icon: Smartphone }] : []),
     { id: 'whatsapp', label: 'WhatsApp', icon: QrCode },
     { id: 'general', label: 'Geral', icon: Clock },
     { id: 'notifications', label: 'Notificações', icon: Bell },
@@ -108,6 +114,14 @@ export function Settings({ connections, onSave }: SettingsProps) {
         </div>
 
         <div className="p-6">
+          {activeTab === 'session' && kohlConnections && onSelectConnection && selectedConnectionId !== undefined && (
+            <SessionSelector
+              connections={kohlConnections}
+              selectedConnectionId={selectedConnectionId}
+              onSelect={onSelectConnection}
+            />
+          )}
+
           {activeTab === 'whatsapp' && (
             <div className="space-y-6">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

@@ -591,6 +591,23 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ ok: true, status: "disconnected" });
     }
 
+    // ── GET /whatsapp-session/sessions ───────────────────────────────────
+    // Lists all active Baileys sessions on the EC2 server.
+    if (req.method === "GET" && action === "sessions") {
+      if (!getBaileysUrl()) {
+        return jsonResponse({ ok: false, code: "NOT_CONFIGURED", sessions: [] });
+      }
+
+      try {
+        const res = await baileysGet("/sessions");
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+        return jsonResponse({ ok: true, sessions: (body.sessions ?? body) });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return jsonResponse({ ok: false, code: "BAILEYS_ERROR", error: msg, sessions: [] });
+      }
+    }
+
     return jsonResponse({ error: "Unknown action" }, 404);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

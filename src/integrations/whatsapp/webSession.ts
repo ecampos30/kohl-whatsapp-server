@@ -90,3 +90,21 @@ export async function deleteSession(connectionId: string): Promise<SessionStatus
     return { ok: false, error: 'Erro de rede ao encerrar sessao.' };
   }
 }
+
+export interface BaileysSession {
+  id: string;
+  status: string;
+}
+
+export async function listSessions(): Promise<{ ok: boolean; sessions: BaileysSession[]; error?: string }> {
+  try {
+    const token = await getAuthToken();
+    const res = await fetch(
+      `${SUPABASE_URL}/functions/v1/whatsapp-session/sessions`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    return await res.json();
+  } catch (err) {
+    return { ok: false, sessions: [], error: 'Erro de rede ao listar sessoes.' };
+  }
+}

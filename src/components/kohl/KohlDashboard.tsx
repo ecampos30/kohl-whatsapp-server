@@ -82,6 +82,14 @@ export function KohlDashboard() {
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string>(
+    () => localStorage.getItem('kohl_selected_connection') ?? connections[0]?.id ?? ''
+  );
+
+  const handleSelectConnection = (id: string) => {
+    setSelectedConnectionId(id);
+    localStorage.setItem('kohl_selected_connection', id);
+  };
 
   // Simular algumas conexões para demonstração
   useEffect(() => {
@@ -204,7 +212,7 @@ export function KohlDashboard() {
           <AIConfiguration
             config={aiConfigs[0]}
             onSave={handleSaveAIConfig}
-            connectionId={connections[0]?.id}
+            connectionId={selectedConnectionId || connections[0]?.id}
             clientId={authClientId}
           />
         );
@@ -241,14 +249,17 @@ export function KohlDashboard() {
         return (
           <SystemStatus
             clientId={authClientId}
-            connectionId={connections[0]?.id}
+            connectionId={selectedConnectionId || connections[0]?.id}
           />
         );
       case 'settings':
         return (
           <Settings
-            connections={connections}
-            onSave={setConnections}
+            connections={[]}
+            onSave={() => {}}
+            kohlConnections={connections}
+            selectedConnectionId={selectedConnectionId}
+            onSelectConnection={handleSelectConnection}
           />
         );
       default:
@@ -282,6 +293,19 @@ export function KohlDashboard() {
               {connections.filter(c => c.connectionType === 'web').length} Web QR • {' '}
               {connections.filter(c => c.connectionType === 'api').length} Business API
             </div>
+
+            {selectedConnectionId && (
+              <button
+                onClick={() => setActiveSection('settings')}
+                className="flex items-center space-x-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1.5 rounded-lg transition-colors"
+                title="Clique para trocar a sessao ativa"
+              >
+                <span className="font-medium">Enviando via:</span>
+                <span className="text-gray-900 font-semibold">
+                  {connections.find(c => c.id === selectedConnectionId)?.name ?? selectedConnectionId}
+                </span>
+              </button>
+            )}
             
             <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
               <span className="text-gray-600 text-sm font-medium">A</span>
