@@ -68,34 +68,64 @@ Deno.serve(async (req: Request) => {
         payload: body,
       });
 
-      const entry = body?.entry?.[0];
-      const change = entry?.changes?.[0];
-      const value = change?.value;
+      // Normalise into a flat list of messages regardless of source format
+      type NormalisedMessage = {
+        externalMessageId: string;
+        fromNumber: string;
+        messageBody: string;
+        connectionKey: { type: "baileys"; connectionId: string } | { type: "api"; phoneNumberId: string };
+      };
 
-      if (!value?.messages?.length) {
-        return jsonResponse({ status: "no_messages" });
+      const normalisedMessages: NormalisedMessage[] = [];
+
+      if (body?.connectionId) {
+        // ── Baileys flat payload ─────────────────────────────────────────
+        normalisedMessages.push({
+          externalMessageId: body.messageId ?? `baileys-${Date.now()}`,
+          fromNumber: body.from ?? "",
+          messageBody: body.text ?? "",
+          connectionKey: { type: "baileys", connectionId: body.connectionId },
+        });
+      } else {
+        // ── WhatsApp Business API (Cloud API) payload ────────────────────
+        const entry = body?.entry?.[0];
+        const change = entry?.changes?.[0];
+        const value = change?.value;
+
+        if (!value?.messages?.length) {
+          return jsonResponse({ status: "no_messages" });
+        }
+
+        const phoneNumberId = value.metadata?.phone_number_id;
+        for (const msg of value.messages) {
+          normalisedMessages.push({
+            externalMessageId: msg.id,
+            fromNumber: msg.from,
+            messageBody: msg.text?.body ?? msg.type ?? "",
+            connectionKey: { type: "api", phoneNumberId },
+          });
+        }
       }
 
-      for (const msg of value.messages) {
-        const externalMessageId = msg.id;
-        const fromNumber = msg.from;
-        const phoneNumberId = value.metadata?.phone_number_id;
-        const messageBody = msg.text?.body ?? msg.type ?? "";
+      for (const { externalMessageId, fromNumber, messageBody, connectionKey } of normalisedMessages) {
+        // Resolve connection
+        let connectionQuery = supabase.from("whatsapp_connections").select("id, client_id, connection_type, api_credentials");
 
-        // Resolve connection from phone_number_id
-        const { data: connection } = await supabase
-          .from("whatsapp_connections")
-          .select("id, client_id")
-          .eq("api_credentials->phoneNumberId", phoneNumberId)
-          .maybeSingle();
+        if (connectionKey.type === "baileys") {
+          connectionQuery = connectionQuery.eq("connection_id_slug", connectionKey.connectionId);
+        } else {
+          connectionQuery = connectionQuery.eq("api_credentials->phoneNumberId", connectionKey.phoneNumberId);
+        }
+
+        const { data: connection } = await connectionQuery.maybeSingle();
 
         if (!connection) {
           await supabase.from("system_logs").insert({
             client_id: null,
             level: "WARN",
             event_type: "message_unrouted",
-            message: `No connection found for phoneNumberId ${phoneNumberId}`,
-            payload: { phoneNumberId, externalMessageId },
+            message: `No connection found for key ${JSON.stringify(connectionKey)}`,
+            payload: { connectionKey, externalMessageId },
           });
           continue;
         }
@@ -125,6 +155,7 @@ Deno.serve(async (req: Request) => {
         if (existing) {
           messageDbId = existing.id;
         } else {
+          const toNumber = connectionKey.type === "api" ? connectionKey.phoneNumberId : null;
           const { data: inserted } = await supabase
             .from("messages")
             .insert({
@@ -133,7 +164,7 @@ Deno.serve(async (req: Request) => {
               external_message_id: externalMessageId,
               direction: "inbound",
               from_number: fromNumber,
-              to_number: phoneNumberId,
+              to_number: toNumber,
               body: messageBody,
             })
             .select("id")
@@ -308,22 +339,52 @@ Deno.serve(async (req: Request) => {
             payload: { connection_id, to: fromNumber },
           });
 
-          // Send via WhatsApp Business API
-          const { data: conn } = await supabase
-            .from("whatsapp_connections")
-            .select("api_credentials, connection_type")
-            .eq("id", connection_id)
-            .maybeSingle();
+          // Send reply via the appropriate transport
+          const connType = (connection as Record<string, unknown>).connection_type as string | undefined;
+          const connCreds = (connection as Record<string, unknown>).api_credentials as Record<string, string> | undefined;
 
-          if (conn?.connection_type === "api_oficial" && conn.api_credentials) {
-            const creds = conn.api_credentials as Record<string, string>;
+          if (connType === "web_baileys") {
+            const baileysUrl = Deno.env.get("BAILEYS_SERVER_URL");
+            const baileysSecret = Deno.env.get("BAILEYS_API_SECRET");
+            if (baileysUrl && baileysSecret) {
+              const slugKey = connectionKey as { type: "baileys"; connectionId: string };
+              const sendRes = await fetch(
+                `${baileysUrl}/session/${slugKey.connectionId}/send`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${baileysSecret}`,
+                  },
+                  body: JSON.stringify({ to: fromNumber, text: aiReply }),
+                }
+              );
+              if (!sendRes.ok) {
+                await supabase.from("system_logs").insert({
+                  client_id,
+                  level: "ERROR",
+                  event_type: "whatsapp_send_failed",
+                  message: `Baileys send failed: HTTP ${sendRes.status}`,
+                  payload: { connection_id, to: fromNumber },
+                });
+              }
+            } else {
+              await supabase.from("system_logs").insert({
+                client_id,
+                level: "WARN",
+                event_type: "baileys_not_configured",
+                message: "BAILEYS_SERVER_URL or BAILEYS_API_SECRET not set",
+                payload: { connection_id },
+              });
+            }
+          } else if (connType === "api_oficial" && connCreds) {
             const waRes = await fetch(
-              `https://graph.facebook.com/v18.0/${creds.phoneNumberId}/messages`,
+              `https://graph.facebook.com/v18.0/${connCreds.phoneNumberId}/messages`,
               {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  Authorization: `Bearer ${creds.accessToken}`,
+                  Authorization: `Bearer ${connCreds.accessToken}`,
                 },
                 body: JSON.stringify({
                   messaging_product: "whatsapp",
@@ -332,7 +393,6 @@ Deno.serve(async (req: Request) => {
                 }),
               }
             );
-
             if (!waRes.ok) {
               await supabase.from("system_logs").insert({
                 client_id,

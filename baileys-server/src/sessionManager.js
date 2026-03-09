@@ -131,9 +131,49 @@ async function _connectSession(connectionId, sessionDir) {
 
   sock.ev.on('messages.upsert', ({ messages }) => {
     for (const msg of messages) {
-      if (!msg.key.fromMe) {
-        console.log(`[${connectionId}] Inbound message from ${msg.key.remoteJid}`);
+      if (msg.key.fromMe) continue;
+
+      const from = msg.key.remoteJid;
+      const text =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.imageMessage?.caption ||
+        msg.message?.videoMessage?.caption ||
+        '';
+      const messageId = msg.key.id;
+      const pushName = msg.pushName || '';
+      const timestamp = msg.messageTimestamp
+        ? new Date(Number(msg.messageTimestamp) * 1000).toISOString()
+        : new Date().toISOString();
+
+      console.log(`[${connectionId}] Inbound message from ${from}: ${text.slice(0, 60)}`);
+
+      const webhookUrl = process.env.WEBHOOK_INBOUND_URL;
+      if (!webhookUrl) {
+        console.warn(`[${connectionId}] WEBHOOK_INBOUND_URL not set — message not forwarded`);
+        continue;
       }
+
+      const payload = JSON.stringify({ connectionId, from, text, messageId, pushName, timestamp });
+
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.BAILEYS_API_SECRET || ''}`,
+        },
+        body: payload,
+      })
+        .then((res) => {
+          if (!res.ok) {
+            console.error(`[${connectionId}] Webhook returned HTTP ${res.status}`);
+          } else {
+            console.log(`[${connectionId}] Webhook forwarded — messageId: ${messageId}`);
+          }
+        })
+        .catch((err) => {
+          console.error(`[${connectionId}] Webhook POST failed:`, err.message);
+        });
     }
   });
 }
