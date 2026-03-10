@@ -129,9 +129,22 @@ async function _connectSession(connectionId, sessionDir) {
     }
   });
 
+  const seenMessageIds = new Set();
+  const SEEN_LIMIT = 500;
+
   sock.ev.on('messages.upsert', ({ messages }) => {
     for (const msg of messages) {
       if (msg.key.fromMe) continue;
+
+      const msgId = msg.key.id;
+      if (seenMessageIds.has(msgId)) {
+        console.log(`[${connectionId}] Duplicate message ignored — messageId: ${msgId}`);
+        continue;
+      }
+      if (seenMessageIds.size >= SEEN_LIMIT) {
+        seenMessageIds.delete(seenMessageIds.values().next().value);
+      }
+      seenMessageIds.add(msgId);
 
       const from = msg.key.remoteJid;
       const text =
