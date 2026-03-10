@@ -240,10 +240,68 @@ function listSessions() {
   return result;
 }
 
+async function restoreSessionsOnBoot() {
+  if (!fs.existsSync(SESSIONS_DIR)) {
+    console.log('[boot] No sessions directory found, skipping restore');
+    return;
+  }
+
+  let entries;
+  try {
+    entries = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true });
+  } catch (err) {
+    console.error('[boot] Failed to read sessions directory:', err.message);
+    return;
+  }
+
+  const dirs = entries.filter((e) => e.isDirectory());
+
+  if (dirs.length === 0) {
+    console.log('[boot] No sessions found on disk');
+    return;
+  }
+
+  console.log(`[boot] Found ${dirs.length} session(s) to restore: ${dirs.map((d) => d.name).join(', ')}`);
+
+  for (const dir of dirs) {
+    const connectionId = dir.name;
+
+    if (sessions.has(connectionId)) {
+      console.log(`[boot] Session ${connectionId} already in memory, skipping`);
+      continue;
+    }
+
+    const sessionDir = path.join(SESSIONS_DIR, connectionId);
+
+    const sessionData = {
+      sock: null,
+      status: 'disconnected',
+      qr: null,
+      qrGeneratedAt: null,
+      phoneNumber: null,
+      retryCount: 0,
+      startedAt: Date.now(),
+    };
+
+    sessions.set(connectionId, sessionData);
+
+    try {
+      await _connectSession(connectionId, sessionDir);
+      console.log(`[boot] Session ${connectionId} restore initiated`);
+    } catch (err) {
+      console.error(`[boot] Failed to restore session ${connectionId}:`, err.message);
+      sessions.delete(connectionId);
+    }
+  }
+
+  console.log('[boot] Session restore complete');
+}
+
 module.exports = {
   startSession,
   getSession,
   stopSession,
   sendTextMessage,
   listSessions,
+  restoreSessionsOnBoot,
 };

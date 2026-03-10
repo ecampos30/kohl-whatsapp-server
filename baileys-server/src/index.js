@@ -10,6 +10,7 @@ const {
   stopSession,
   sendTextMessage,
   listSessions,
+  restoreSessionsOnBoot,
 } = require('./sessionManager');
 
 const app = express();
@@ -164,4 +165,7 @@ app.use((err, req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`Baileys multi-session server running on port ${PORT}`);
+  restoreSessionsOnBoot().catch((err) => {
+    console.error('[boot] restoreSessionsOnBoot failed:', err.message);
+  });
 });
