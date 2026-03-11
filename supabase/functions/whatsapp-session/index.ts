@@ -433,20 +433,28 @@ Deno.serve(async (req: Request) => {
         const res = await baileysGet(`/session/${connectionId}/status`);
         const body = await res.json().catch(() => ({})) as Record<string, unknown>;
 
+        console.log(`[web-status] connectionId=${connectionId} baileysHttpStatus=${res.status} baileysBody=${JSON.stringify(body)}`);
+
+        if (res.status === 404) {
+          return jsonResponse({ ok: false, status: "disconnected", code: "SESSION_NOT_FOUND" });
+        }
+
         const baileysStatus = (body.status as string) ?? "disconnected";
         const mappedStatus =
           baileysStatus === "open" || baileysStatus === "connected" ? "connected"
           : baileysStatus === "scanning" ? "scanning"
-          : "disconnected";
+          : baileysStatus === "disconnected" ? "connecting"
+          : "connecting";
 
         await supabase
           .from("whatsapp_connections")
-          .update({ status: mappedStatus, last_activity: new Date().toISOString() })
+          .update({ status: mappedStatus === "connecting" ? "scanning" : mappedStatus, last_activity: new Date().toISOString() })
           .eq("id", connectionId);
 
         return jsonResponse({ ok: true, status: mappedStatus, raw: body });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[web-status] error connectionId=${connectionId}:`, msg);
         return jsonResponse({ ok: false, code: "BAILEYS_ERROR", error: msg });
       }
     }
@@ -466,8 +474,24 @@ Deno.serve(async (req: Request) => {
 
       try {
         const res = await baileysGet(`/session/${connectionId}/qr`);
-        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
 
+        console.log(`[web-qr] connectionId=${connectionId} baileysHttpStatus=${res.status}`);
+
+        if (res.status === 404) {
+          return jsonResponse({ ok: false, pending: false, qr: null, code: "SESSION_NOT_FOUND" });
+        }
+
+        if (res.status === 202) {
+          const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+          console.log(`[web-qr] QR not ready yet, session status=${body.status}`);
+          return jsonResponse({ ok: false, pending: true, qr: null, status: body.status ?? "connecting" });
+        }
+
+        if (res.status === 410) {
+          return jsonResponse({ ok: false, pending: false, qr: null, code: "ALREADY_CONNECTED" });
+        }
+
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
         const qr = (body.qr as string) ?? null;
 
         if (qr) {
@@ -477,9 +501,10 @@ Deno.serve(async (req: Request) => {
             .eq("id", connectionId);
         }
 
-        return jsonResponse({ ok: !!qr, qr, raw: body });
+        return jsonResponse({ ok: !!qr, pending: false, qr, raw: body });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[web-qr] error connectionId=${connectionId}:`, msg);
         return jsonResponse({ ok: false, code: "BAILEYS_ERROR", error: msg });
       }
     }

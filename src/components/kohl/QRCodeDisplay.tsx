@@ -8,14 +8,30 @@ interface QRCodeDisplayProps {
   onConnectionSuccess: (connectionId: string) => void;
 }
 
-type Phase = 'loading' | 'scanning' | 'connected' | 'error';
+type Phase = 'loading' | 'connecting' | 'scanning' | 'connected' | 'error';
+
+const ERROR_GRACE_MS = 15000;
 
 export function QRCodeDisplay({ connectionId, onClose, onConnectionSuccess }: QRCodeDisplayProps) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stoppedRef = useRef(false);
+  const phaseRef = useRef<Phase>('loading');
+  const qrImageRef = useRef<string | null>(null);
+  const startedAtRef = useRef<number>(Date.now());
+
+  const updatePhase = (p: Phase) => {
+    phaseRef.current = p;
+    setPhase(p);
+  };
+
+  const updateQrImage = (img: string | null) => {
+    qrImageRef.current = img;
+    setQrImage(img);
+  };
 
   const stopPolling = useCallback(() => {
     stoppedRef.current = true;
@@ -32,7 +48,7 @@ export function QRCodeDisplay({ connectionId, onClose, onConnectionSuccess }: QR
 
     if (statusRes.status === 'connected') {
       stopPolling();
-      setPhase('connected');
+      updatePhase('connected');
       setTimeout(() => {
         onConnectionSuccess(connectionId);
         onClose();
@@ -40,35 +56,64 @@ export function QRCodeDisplay({ connectionId, onClose, onConnectionSuccess }: QR
       return;
     }
 
-    if (statusRes.status === 'scanning' || !statusRes.status) {
+    if (statusRes.status === 'scanning') {
       const qrRes = await getSessionQr(connectionId);
       if (qrRes.qr) {
-        setQrImage(qrRes.qr);
-        setPhase('scanning');
-      } else if (phase === 'loading') {
-        setPhase('scanning');
+        updateQrImage(qrRes.qr);
+        updatePhase('scanning');
+        return;
       }
+      if (phaseRef.current === 'loading' || phaseRef.current === 'connecting') {
+        updatePhase('connecting');
+      }
+      return;
+    }
+
+    if (statusRes.status === 'connecting' || !statusRes.status || statusRes.ok === false) {
+      if (phaseRef.current === 'loading' || phaseRef.current === 'connecting') {
+        updatePhase('connecting');
+      }
+      return;
     }
 
     if (statusRes.status === 'disconnected' || statusRes.status === 'error') {
-      if (!qrImage) {
+      const elapsed = Date.now() - startedAtRef.current;
+      if (!qrImageRef.current && elapsed > ERROR_GRACE_MS) {
         stopPolling();
-        setPhase('error');
+        updatePhase('error');
         setErrorMsg(statusRes.error ?? 'Sessao encerrada ou erro no servidor Baileys.');
+      } else if (!qrImageRef.current) {
+        updatePhase('connecting');
       }
     }
-  }, [connectionId, onClose, onConnectionSuccess, phase, qrImage, stopPolling]);
+  }, [connectionId, onClose, onConnectionSuccess, stopPolling]);
 
-  useEffect(() => {
+  const startPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
     stoppedRef.current = false;
+    startedAtRef.current = Date.now();
     poll();
     intervalRef.current = setInterval(poll, 4000);
+  }, [poll]);
+
+  useEffect(() => {
+    startPolling();
     return () => stopPolling();
   }, []);
 
   const handleClose = () => {
     stopPolling();
     onClose();
+  };
+
+  const handleRetry = () => {
+    updatePhase('loading');
+    updateQrImage(null);
+    setErrorMsg('');
+    startPolling();
   };
 
   return (
@@ -95,6 +140,14 @@ export function QRCodeDisplay({ connectionId, onClose, onConnectionSuccess }: QR
             <div className="flex flex-col items-center space-y-3 py-8">
               <RefreshCw className="h-8 w-8 text-gray-400 animate-spin" />
               <p className="text-sm text-gray-500">Buscando QR no servidor...</p>
+            </div>
+          )}
+
+          {phase === 'connecting' && (
+            <div className="flex flex-col items-center space-y-3 py-8">
+              <RefreshCw className="h-8 w-8 text-blue-400 animate-spin" />
+              <p className="text-sm font-medium text-gray-700">Iniciando sessao Baileys...</p>
+              <p className="text-xs text-gray-400 text-center">Aguardando geracao do QR Code.<br />Isso pode levar alguns segundos.</p>
             </div>
           )}
 
@@ -152,13 +205,7 @@ export function QRCodeDisplay({ connectionId, onClose, onConnectionSuccess }: QR
                 <p className="text-xs text-gray-500 mt-1 max-w-xs">{errorMsg}</p>
               </div>
               <button
-                onClick={() => {
-                  stoppedRef.current = false;
-                  setPhase('loading');
-                  setErrorMsg('');
-                  poll();
-                  intervalRef.current = setInterval(poll, 4000);
-                }}
+                onClick={handleRetry}
                 className="flex items-center space-x-1.5 text-sm text-blue-600 hover:underline"
               >
                 <RefreshCw className="h-3.5 w-3.5" />

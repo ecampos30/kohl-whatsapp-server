@@ -101,7 +101,12 @@ app.get('/session/:connectionId/qr', (req, res) => {
   }
 
   if (!session.qr) {
-    return res.status(204).end();
+    return res.status(202).json({
+      pending: true,
+      status: session.status,
+      qrAvailable: false,
+      connectionId,
+    });
   }
 
   const QR_TTL_MS = 60000;
