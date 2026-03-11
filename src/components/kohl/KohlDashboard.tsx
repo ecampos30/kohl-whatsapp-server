@@ -7,6 +7,7 @@ import { LeadManager } from './LeadManager';
 import { Analytics } from './Analytics';
 import { Settings } from '../ui/admin/Settings';
 import { SystemStatus } from './SystemStatus';
+import { MessageTemplates } from './MessageTemplates';
 import { WhatsAppConnection, AIConfiguration as AIConfig, MenuTemplate, Campaign, Lead } from '../../types/kohl-system';
 import { defaultMenuTemplate, kohlFAQs } from '../../data/kohl-courses';
 import { startSession as startWebSession } from '../../integrations/whatsapp/webSession';
@@ -118,6 +119,7 @@ export function KohlDashboard() {
     { id: 'ai', label: 'Configuração de IA', icon: '🤖' },
     { id: 'menu', label: 'Construtor de Menu', icon: '📋' },
     { id: 'campaigns', label: 'Campanhas e Fluxos', icon: '📢' },
+    { id: 'templates', label: 'Templates de Msg', icon: '💬' },
     { id: 'leads', label: 'Gestão de Leads', icon: '👥' },
     { id: 'analytics', label: 'Relatórios', icon: '📊' },
     { id: 'status', label: 'Status do Sistema', icon: '🔍' },
@@ -231,6 +233,8 @@ export function KohlDashboard() {
             onSave={setCampaigns}
           />
         );
+      case 'templates':
+        return <MessageTemplates />;
       case 'leads':
         return (
           <LeadManager

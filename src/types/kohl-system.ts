@@ -149,6 +149,56 @@ export interface MessageButton {
   value: string;
 }
 
+export type MessageTemplateCategory =
+  | 'greeting'
+  | 'pricing'
+  | 'objection'
+  | 'closing'
+  | 'payment_proof'
+  | 'reactivation'
+  | 'campaign'
+  | 'cold_lead'
+  | 'hot_lead'
+  | 'post_pricing'
+  | 'post_negotiation';
+
+export type MessageTemplateType =
+  | 'reactivation'
+  | 'follow_up'
+  | 'urgency'
+  | 'confirmation'
+  | 'closing'
+  | 'cta'
+  | 'link'
+  | 'custom';
+
+export type LeadStage = 'new' | 'contacted' | 'interested' | 'qualified' | 'proposal' | 'enrolled' | 'lost';
+
+export interface TemplateVariable {
+  key: string;
+  label: string;
+  defaultValue?: string;
+}
+
+export interface MessageTemplate {
+  id: string;
+  name: string;
+  category: MessageTemplateCategory;
+  type: MessageTemplateType;
+  body: string;
+  footer?: string;
+  ctaLabel?: string;
+  ctaUrl?: string;
+  linkedStages?: LeadStage[];
+  campaignId?: string;
+  campaignName?: string;
+  variables?: TemplateVariable[];
+  isActive: boolean;
+  mediaPlaceholder?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type LeadEntryChannel = 'whatsapp' | 'website' | 'landing_page' | 'campaign' | 'social' | 'referral' | 'offer' | 'reactivation';
 
 export interface LeadTracking {
