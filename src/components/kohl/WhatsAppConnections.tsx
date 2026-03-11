@@ -287,30 +287,27 @@ export function WhatsAppConnections({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Conexões WhatsApp</h2>
-          <p className="text-gray-500 text-sm mt-0.5">Gerencie e monitore suas conexões de WhatsApp</p>
+          <h2 className="text-lg font-semibold text-gray-900">Conexoes WhatsApp</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Gerencie e monitore suas conexoes de WhatsApp</p>
         </div>
         {connections.length < 5 && (
           <button
             onClick={onAddConnection}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm font-medium"
+            className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             <Plus className="h-4 w-4" />
-            <span>Adicionar WhatsApp</span>
+            Adicionar WhatsApp
           </button>
         )}
       </div>
 
       {/* Runtime notice */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start space-x-3">
-        <Server className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-        <div className="text-sm">
-          <p className="font-medium text-blue-900">Sobre os tipos de conexão</p>
-          <p className="text-blue-800 mt-1">
-            <strong>Business API</strong> — usa credenciais Meta, healthcheck e envio via API oficial.{' '}
-            <strong>Web QR</strong> — conecta via servidor Baileys (EC2). Inicie a sessao, escaneie o QR e o status atualiza automaticamente.
-          </p>
-        </div>
+      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+        <Server className="h-4 w-4 text-gray-400 flex-shrink-0" />
+        <p className="text-xs text-gray-500">
+          <strong className="text-gray-700">Business API</strong> — credenciais Meta, envio via API oficial.{' '}
+          <strong className="text-gray-700">Web QR</strong> — inicie a sessao, escaneie o QR Code e o status atualiza automaticamente.
+        </p>
       </div>
 
       {/* Connections grid */}
@@ -327,10 +324,10 @@ export function WhatsAppConnections({
               <div className="p-5">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${isApi ? 'bg-blue-50' : 'bg-green-50'}`}>
+                    <div className={`p-2 rounded-lg ${isApi ? 'bg-gray-100' : 'bg-emerald-50'}`}>
                       {isApi
-                        ? <Key className="h-5 w-5 text-blue-600" />
-                        : <Smartphone className="h-5 w-5 text-green-600" />}
+                        ? <Key className="h-5 w-5 text-gray-600" />
+                        : <Smartphone className="h-5 w-5 text-emerald-600" />}
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-900 text-sm">{connection.name}</h3>
@@ -382,20 +379,28 @@ export function WhatsAppConnections({
 
               {/* Action buttons */}
               <div className="px-5 pb-4 space-y-2">
-                {/* Pause / Resume */}
-                <button
-                  onClick={() => handleTogglePause(connection.id)}
-                  disabled={togglingPause === connection.id}
-                  className={`w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
-                    pausedConnections.has(connection.id)
-                      ? 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
-                      : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100'
-                  }`}
-                >
-                  {pausedConnections.has(connection.id)
-                    ? <><PlayCircle className="h-3.5 w-3.5" /><span>Retomar bot de IA</span></>
-                    : <><PauseCircle className="h-3.5 w-3.5" /><span>Pausar bot de IA</span></>}
-                </button>
+                {/* Pause / Resume — secondary action always present */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleTogglePause(connection.id)}
+                    disabled={togglingPause === connection.id}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 ${
+                      pausedConnections.has(connection.id)
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                        : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    {pausedConnections.has(connection.id)
+                      ? <><PlayCircle className="h-3.5 w-3.5" /><span>Retomar bot</span></>
+                      : <><PauseCircle className="h-3.5 w-3.5" /><span>Pausar bot</span></>}
+                  </button>
+                  <span className={`h-2 w-2 rounded-full flex-shrink-0 ${
+                    pausedConnections.has(connection.id) ? 'bg-amber-400' : 'bg-emerald-400'
+                  }`} />
+                </div>
+
+                {/* Connection-specific actions */}
+                <div className="pt-1 border-t border-gray-100 space-y-2">
 
                 {/* Business API actions */}
                 {isApi && (
@@ -403,7 +408,7 @@ export function WhatsAppConnections({
                     {(connection.status === 'disconnected' || connection.status === 'error') && (
                       <button
                         onClick={() => setShowApiConfig(connection.id)}
-                        className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                        className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium bg-gray-900 hover:bg-gray-800 text-white transition-colors"
                       >
                         <Key className="h-3.5 w-3.5" />
                         <span>Configurar Business API</span>
@@ -472,7 +477,7 @@ export function WhatsAppConnections({
                       <button
                         onClick={() => handleWebStart(connection.id)}
                         disabled={webStartLoading.has(connection.id)}
-                        className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
+                        className="w-full flex items-center justify-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium bg-gray-900 hover:bg-gray-800 text-white transition-colors disabled:opacity-50"
                       >
                         {webStartLoading.has(connection.id)
                           ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /><span>Iniciando sessao...</span></>
@@ -546,9 +551,10 @@ export function WhatsAppConnections({
                   >
                     {resetLoading.has(connection.id)
                       ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" /><span>Reiniciando...</span></>
-                      : <><X className="h-3.5 w-3.5" /><span>Reiniciar sessão</span></>}
+                      : <><X className="h-3.5 w-3.5" /><span>Reiniciar sessao</span></>}
                   </button>
                 )}
+                </div>{/* end connection-specific actions */}
               </div>
 
               {/* Diagnostic logs toggle */}
@@ -588,7 +594,7 @@ export function WhatsAppConnections({
                     )}
                     <button
                       onClick={() => loadLogs(connection.id)}
-                      className="text-xs text-blue-600 hover:underline mt-1"
+                      className="text-xs text-gray-500 hover:text-gray-800 underline underline-offset-2 mt-1"
                     >
                       Atualizar logs
                     </button>
@@ -612,31 +618,20 @@ export function WhatsAppConnections({
       {connections.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Resumo do sistema</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {connections.filter(c => c.connectionType === 'api').length}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-0 divide-x divide-gray-100">
+            {[
+              { value: connections.filter(c => c.connectionType === 'api').length, label: 'Business API' },
+              { value: connections.filter(c => c.connectionType === 'web').length, label: 'Web QR' },
+              { value: connections.filter(c => c.status === 'connected').length, label: 'Conectados', highlight: true },
+              { value: connections.reduce((sum, c) => sum + c.messageCount, 0), label: 'Msgs hoje' },
+            ].map((item, i) => (
+              <div key={i} className="py-1 text-center">
+                <div className={`text-2xl font-bold ${item.highlight ? 'text-emerald-600' : 'text-gray-900'}`}>
+                  {item.value}
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">{item.label}</div>
               </div>
-              <div className="text-xs text-gray-500 mt-1">Business API</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                {connections.filter(c => c.connectionType === 'web').length}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">Web QR</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-emerald-600">
-                {connections.filter(c => c.status === 'connected').length}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">Conectados</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
-                {connections.reduce((sum, c) => sum + c.messageCount, 0)}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">Msgs hoje</div>
-            </div>
+            ))}
           </div>
         </div>
       )}
@@ -794,7 +789,7 @@ function ApiConfigModal({
                 type={type}
                 value={formData[key as keyof typeof formData]}
                 onChange={e => setFormData(prev => ({ ...prev, [key]: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 placeholder={placeholder}
               />
             </div>
@@ -827,7 +822,7 @@ function ApiConfigModal({
           <button
             onClick={handleSave}
             disabled={!result?.ok || saving}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? 'Salvando...' : 'Salvar e ativar conexão'}
           </button>

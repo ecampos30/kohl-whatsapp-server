@@ -258,101 +258,115 @@ export function SystemStatus({ clientId, connectionId }: SystemStatusProps) {
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* WhatsApp */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              {connectionStatus.status === 'connected' ? (
-                <Wifi className="h-5 w-5 text-green-600" />
-              ) : (
-                <WifiOff className="h-5 w-5 text-red-500" />
-              )}
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-700">WhatsApp</p>
-              <div className="flex items-center space-x-1.5">
-                {statusDot(connectionStatus.status)}
-                <span className="text-sm font-semibold capitalize text-gray-900">
-                  {connectionStatus.status === 'connected' ? 'Conectado' :
-                   connectionStatus.status === 'disconnected' ? 'Desconectado' :
-                   connectionStatus.status === 'scanning' ? 'Aguardando QR' :
-                   connectionStatus.status === 'error' ? 'Erro' : 'Desconhecido'}
-                </span>
+        {(() => {
+          const connected = connectionStatus.status === 'connected';
+          const error = connectionStatus.status === 'error' || connectionStatus.status === 'disconnected';
+          return (
+            <div className={`bg-white rounded-xl border overflow-hidden ${error ? 'border-red-200' : connected ? 'border-emerald-200' : 'border-gray-200'}`}>
+              <div className={`h-1 ${error ? 'bg-red-400' : connected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${connected ? 'bg-emerald-50' : error ? 'bg-red-50' : 'bg-amber-50'}`}>
+                      {connected
+                        ? <Wifi className="h-4 w-4 text-emerald-600" />
+                        : error ? <WifiOff className="h-4 w-4 text-red-500" />
+                        : <WifiOff className="h-4 w-4 text-amber-500" />}
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-medium">WhatsApp</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {statusDot(connectionStatus.status)}
+                        <span className="text-sm font-semibold text-gray-900">
+                          {connectionStatus.status === 'connected' ? 'Conectado' :
+                           connectionStatus.status === 'disconnected' ? 'Desconectado' :
+                           connectionStatus.status === 'scanning' ? 'Aguardando QR' :
+                           connectionStatus.status === 'error' ? 'Erro' : 'Desconhecido'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {connectionStatus.phone && (
+                  <p className="text-xs text-gray-500 mt-1">{connectionStatus.phone}</p>
+                )}
+                {connectionStatus.lastEvent && (
+                  <div className="flex items-center gap-1 mt-2">
+                    <Clock className="h-3 w-3 text-gray-400" />
+                    <p className="text-xs text-gray-400">
+                      {new Date(connectionStatus.lastEvent).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-          {connectionStatus.phone && (
-            <p className="text-xs text-gray-500">{connectionStatus.phone}</p>
-          )}
-          {connectionStatus.lastEvent && (
-            <div className="flex items-center space-x-1 mt-2">
-              <Clock className="h-3 w-3 text-gray-400" />
-              <p className="text-xs text-gray-400">
-                {new Date(connectionStatus.lastEvent).toLocaleString('pt-BR')}
-              </p>
-            </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Webhook */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className={`p-2 rounded-lg ${webhookStatus.ok ? 'bg-green-100' : 'bg-gray-100'}`}>
-              <Webhook className={`h-5 w-5 ${webhookStatus.ok ? 'text-green-600' : 'text-gray-400'}`} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-700">Webhook / Listener</p>
-              <div className="flex items-center space-x-1.5">
-                <span className={`inline-block w-2.5 h-2.5 rounded-full ${webhookStatus.ok ? 'bg-green-500' : 'bg-gray-400'}`} />
-                <span className="text-sm font-semibold text-gray-900">
-                  {webhookStatus.ok ? 'Recebendo' : 'Sem atividade'}
-                </span>
+        <div className={`bg-white rounded-xl border overflow-hidden ${webhookStatus.ok ? 'border-emerald-200' : 'border-gray-200'}`}>
+          <div className={`h-1 ${webhookStatus.ok ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+          <div className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`p-2 rounded-lg ${webhookStatus.ok ? 'bg-emerald-50' : 'bg-gray-100'}`}>
+                <Webhook className={`h-4 w-4 ${webhookStatus.ok ? 'text-emerald-600' : 'text-gray-400'}`} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Webhook</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`inline-block w-2 h-2 rounded-full ${webhookStatus.ok ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+                  <span className="text-sm font-semibold text-gray-900">
+                    {webhookStatus.ok ? 'Recebendo' : 'Sem atividade'}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-          {webhookStatus.lastSeen && (
-            <div className="flex items-center space-x-1 mb-2">
-              <Clock className="h-3 w-3 text-gray-400" />
-              <p className="text-xs text-gray-400">
-                {new Date(webhookStatus.lastSeen).toLocaleString('pt-BR')}
+            {webhookStatus.lastSeen && (
+              <div className="flex items-center gap-1 mb-2">
+                <Clock className="h-3 w-3 text-gray-400" />
+                <p className="text-xs text-gray-400">
+                  {new Date(webhookStatus.lastSeen).toLocaleString('pt-BR')}
+                </p>
+              </div>
+            )}
+            {webhookStatus.lastPayload && (
+              <p className="text-xs text-gray-500 font-mono bg-gray-50 rounded-lg px-2.5 py-1.5 truncate">
+                {webhookStatus.lastPayload}
               </p>
-            </div>
-          )}
-          {webhookStatus.lastPayload && (
-            <p className="text-xs text-gray-500 font-mono bg-gray-50 rounded p-2 truncate">
-              {webhookStatus.lastPayload}
-            </p>
-          )}
+            )}
+          </div>
         </div>
 
         {/* OpenAI */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className={`p-2 rounded-lg ${openAIStatus.configured ? 'bg-blue-100' : 'bg-gray-100'}`}>
-              <Brain className={`h-5 w-5 ${openAIStatus.configured ? 'text-blue-600' : 'text-gray-400'}`} />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-700">OpenAI API Key</p>
-              <div className="flex items-center space-x-1.5">
-                <span className={`inline-block w-2.5 h-2.5 rounded-full ${openAIStatus.configured ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className="text-sm font-semibold text-gray-900">
-                  {openAIStatus.configured
-                    ? `Configurada (...${openAIStatus.last4})`
-                    : 'Nao configurada'}
-                </span>
+        <div className={`bg-white rounded-xl border overflow-hidden ${openAIStatus.configured ? 'border-gray-200' : 'border-amber-200'}`}>
+          <div className={`h-1 ${openAIStatus.configured ? 'bg-gray-200' : 'bg-amber-400'}`} />
+          <div className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`p-2 rounded-lg ${openAIStatus.configured ? 'bg-gray-100' : 'bg-amber-50'}`}>
+                <Brain className={`h-4 w-4 ${openAIStatus.configured ? 'text-gray-600' : 'text-amber-500'}`} />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">OpenAI API Key</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`inline-block w-2 h-2 rounded-full ${openAIStatus.configured ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                  <span className="text-sm font-semibold text-gray-900">
+                    {openAIStatus.configured ? `Configurada (...${openAIStatus.last4})` : 'Nao configurada'}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex items-center justify-between mt-2">
-            <span className={`text-xs font-medium ${openAIResultLabel[openAIStatus.testResult]?.color}`}>
-              {openAIResultLabel[openAIStatus.testResult]?.label}
-            </span>
-            <button
-              onClick={handleTestOpenAI}
-              disabled={openAIStatus.testResult === 'testing' || !connectionId}
-              className="text-xs bg-gray-900 hover:bg-gray-800 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-            >
-              Testar Conexao
-            </button>
+            <div className="flex items-center justify-between">
+              <span className={`text-xs font-medium ${openAIResultLabel[openAIStatus.testResult]?.color}`}>
+                {openAIResultLabel[openAIStatus.testResult]?.label}
+              </span>
+              <button
+                onClick={handleTestOpenAI}
+                disabled={openAIStatus.testResult === 'testing' || !connectionId}
+                className="text-xs bg-gray-900 hover:bg-gray-800 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Testar
+              </button>
+            </div>
           </div>
         </div>
       </div>

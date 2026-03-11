@@ -124,13 +124,13 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
   const { isLeadPaused, getLeadEntry, pause, resume, loadingJid, handoffMap } = useHandoff(connections);
 
   const stages = [
-    { id: 'all', label: 'All Leads', color: 'gray' },
-    { id: 'new', label: 'New', color: 'blue' },
-    { id: 'contacted', label: 'Contacted', color: 'yellow' },
-    { id: 'interested', label: 'Interested', color: 'orange' },
-    { id: 'qualified', label: 'Qualified', color: 'green' },
-    { id: 'enrolled', label: 'Enrolled', color: 'purple' },
-    { id: 'lost', label: 'Lost', color: 'red' }
+    { id: 'all', label: 'Todos', pill: 'bg-gray-100 text-gray-700' },
+    { id: 'new', label: 'Novo', pill: 'bg-sky-100 text-sky-800' },
+    { id: 'contacted', label: 'Contactado', pill: 'bg-yellow-100 text-yellow-800' },
+    { id: 'interested', label: 'Interessado', pill: 'bg-orange-100 text-orange-800' },
+    { id: 'qualified', label: 'Qualificado', pill: 'bg-emerald-100 text-emerald-800' },
+    { id: 'enrolled', label: 'Matriculado', pill: 'bg-rose-100 text-rose-800' },
+    { id: 'lost', label: 'Perdido', pill: 'bg-gray-100 text-gray-500' },
   ];
 
   const filteredLeads = leads.filter(lead => {
@@ -154,24 +154,23 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
 
   const getStageColor = (stage: string) => {
     const stageConfig = stages.find(s => s.id === stage);
-    const color = stageConfig?.color || 'gray';
-    return `bg-${color}-100 text-${color}-800`;
+    return stageConfig?.pill ?? 'bg-gray-100 text-gray-600';
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Lead Management</h2>
-          <p className="text-gray-600">Track and manage your beauty course leads</p>
+          <h2 className="text-lg font-semibold text-gray-900">Gestao de Leads</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Acompanhe e gerencie seus leads de cursos de beleza</p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+          className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Plus className="h-4 w-4" />
-          <span>Add Lead</span>
+          Novo Lead
         </button>
       </div>
 
@@ -181,7 +180,7 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
           onClick={() => setActiveTab('leads')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'leads'
-              ? 'border-blue-600 text-blue-600'
+              ? 'border-gray-900 text-gray-900'
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -228,10 +227,10 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search leads by name or phone..."
+                  placeholder="Buscar por nome ou telefone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 />
               </div>
 
@@ -240,7 +239,7 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
                 <select
                   value={selectedStage}
                   onChange={(e) => setSelectedStage(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 >
                   {stages.map((stage) => (
                     <option key={stage.id} value={stage.id}>
@@ -268,14 +267,21 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
           </div>
 
           {/* Lead Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
             {stages.slice(1).map((stage) => {
               const count = leads.filter(lead => lead.stage === stage.id).length;
+              const isActive = selectedStage === stage.id;
               return (
-                <div key={stage.id} className="bg-white rounded-lg p-4 border border-gray-200">
-                  <div className="text-2xl font-bold text-gray-900">{count}</div>
-                  <div className="text-sm text-gray-600">{stage.label}</div>
-                </div>
+                <button
+                  key={stage.id}
+                  onClick={() => setSelectedStage(isActive ? 'all' : stage.id)}
+                  className={`bg-white rounded-xl p-3 border text-left transition-all hover:border-gray-300 hover:shadow-sm ${
+                    isActive ? 'border-gray-900 ring-1 ring-gray-900' : 'border-gray-200'
+                  }`}
+                >
+                  <div className="text-xl font-bold text-gray-900 leading-none">{count}</div>
+                  <div className="text-xs text-gray-500 mt-1.5 font-medium">{stage.label}</div>
+                </button>
               );
             })}
           </div>
@@ -283,21 +289,25 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
           {/* Leads List */}
           {filteredLeads.length === 0 ? (
             <div className="bg-white rounded-xl p-12 border border-gray-200 text-center">
-              <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
-              <p className="text-gray-600 mb-6">
+              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <MessageCircle className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                {searchTerm || selectedStage !== 'all' || showOnlyAlerts ? 'Nenhum lead encontrado' : 'Sem leads ainda'}
+              </h3>
+              <p className="text-sm text-gray-500 mb-6 max-w-xs mx-auto">
                 {searchTerm || selectedStage !== 'all' || showOnlyAlerts
-                  ? 'Try adjusting your search or filters'
-                  : 'Start by adding your first lead or connecting WhatsApp to receive leads automatically'
+                  ? 'Tente ajustar a busca ou os filtros'
+                  : 'Adicione seu primeiro lead ou conecte o WhatsApp para receber leads automaticamente'
                 }
               </p>
               {!searchTerm && selectedStage === 'all' && !showOnlyAlerts && (
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 mx-auto transition-colors"
+                  className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg mx-auto transition-colors"
                 >
-                  <Plus className="h-5 w-5" />
-                  <span>Add First Lead</span>
+                  <Plus className="h-4 w-4" />
+                  Adicionar Primeiro Lead
                 </button>
               )}
             </div>
@@ -309,12 +319,12 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
                 const jid = lead.phone.includes('@') ? lead.phone : `${lead.phone.replace(/\D/g, '')}@s.whatsapp.net`;
                 const isLoading = loadingJid === jid || loadingJid === lead.phone;
                 return (
-                  <div key={lead.id} className={`bg-white rounded-xl p-6 border transition-shadow hover:shadow-lg ${paused ? 'border-amber-300' : 'border-gray-200'}`}>
-                    <div className="flex items-start justify-between mb-4">
+                  <div key={lead.id} className={`bg-white rounded-xl p-5 border transition-all hover:shadow-md ${paused ? 'border-amber-300' : 'border-gray-200 hover:border-gray-300'}`}>
+                    <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{lead.name}</h3>
-                        <p className="text-gray-600">{lead.phone}</p>
-                        {lead.email && <p className="text-sm text-gray-500">{lead.email}</p>}
+                        <h3 className="text-sm font-semibold text-gray-900">{lead.name}</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">{lead.phone}</p>
+                        {lead.email && <p className="text-xs text-gray-400">{lead.email}</p>}
                       </div>
 
                       <div className="flex flex-col items-end space-y-2">
@@ -359,7 +369,7 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
                           <p className="text-sm font-medium text-gray-700 mb-1">Cursos de Interesse:</p>
                           <div className="flex flex-wrap gap-1">
                             {lead.interestedCourses.slice(0, 2).map((courseId) => (
-                              <span key={courseId} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                              <span key={courseId} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-md font-medium">
                                 {courseId.replace('-', ' ')}
                               </span>
                             ))}
@@ -408,11 +418,8 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
                         </div>
 
                         <div className="flex items-center space-x-2">
-                          <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                          <button className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors" title="Abrir conversa">
                             <MessageCircle className="h-4 w-4" />
-                          </button>
-                          <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                            Ver Detalhes
                           </button>
                         </div>
                       </div>
@@ -422,7 +429,7 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
                           <button
                             onClick={() => resume(lead.phone)}
                             disabled={isLoading}
-                            className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
+                            className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
                           >
                             {isLoading ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -691,7 +698,7 @@ function AddLeadModal({
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 placeholder="Maria Silva"
               />
             </div>
@@ -705,7 +712,7 @@ function AddLeadModal({
                 required
                 value={formData.phone}
                 onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 placeholder="+55 11 99999-9999"
               />
             </div>
@@ -720,7 +727,7 @@ function AddLeadModal({
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 placeholder="maria@email.com"
               />
             </div>
@@ -732,7 +739,7 @@ function AddLeadModal({
               <select
                 value={formData.whatsappId}
                 onChange={(e) => setFormData({...formData, whatsappId: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
               >
                 {connections.map((conn) => (
                   <option key={conn.id} value={conn.id}>
@@ -752,7 +759,7 @@ function AddLeadModal({
                 type="text"
                 value={formData.city}
                 onChange={(e) => setFormData({...formData, city: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 placeholder="Sao Paulo"
               />
             </div>
@@ -765,7 +772,7 @@ function AddLeadModal({
                 type="text"
                 value={formData.state}
                 onChange={(e) => setFormData({...formData, state: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 placeholder="SP"
               />
             </div>
@@ -777,7 +784,7 @@ function AddLeadModal({
               <select
                 value={formData.source}
                 onChange={(e) => setFormData({...formData, source: e.target.value as Lead['source']})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
               >
                 <option value="organic">Organico</option>
                 <option value="campaign">Campanha</option>
@@ -796,7 +803,7 @@ function AddLeadModal({
               value={formData.notes}
               onChange={(e) => setFormData({...formData, notes: e.target.value})}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
               placeholder="Informacoes adicionais sobre este lead..."
             />
           </div>
@@ -833,7 +840,7 @@ function AddLeadModal({
                     <select
                       value={tracking.entryChannel ?? ''}
                       onChange={(e) => setTracking({ ...tracking, entryChannel: e.target.value as LeadEntryChannel || undefined })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     >
                       <option value="">Nao definido</option>
                       {ENTRY_CHANNELS.map(ch => (
@@ -850,7 +857,7 @@ function AddLeadModal({
                       type="text"
                       value={tracking.originPage ?? ''}
                       onChange={(e) => setTracking({ ...tracking, originPage: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       placeholder="ex: /curso-microblading"
                     />
                   </div>
@@ -865,7 +872,7 @@ function AddLeadModal({
                       type="text"
                       value={tracking.originCourse ?? ''}
                       onChange={(e) => setTracking({ ...tracking, originCourse: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       placeholder="ex: Microblading Avancado"
                     />
                   </div>
@@ -878,7 +885,7 @@ function AddLeadModal({
                       type="text"
                       value={tracking.ctaClicked ?? ''}
                       onChange={(e) => setTracking({ ...tracking, ctaClicked: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       placeholder="ex: Quero me inscrever"
                     />
                   </div>
@@ -893,7 +900,7 @@ function AddLeadModal({
                       type="text"
                       value={tracking.campaignName ?? ''}
                       onChange={(e) => setTracking({ ...tracking, campaignName: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       placeholder="ex: Black Friday 2025"
                     />
                   </div>
@@ -906,7 +913,7 @@ function AddLeadModal({
                       type="text"
                       value={tracking.utmSource ?? ''}
                       onChange={(e) => setTracking({ ...tracking, utmSource: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       placeholder="ex: instagram"
                     />
                   </div>
