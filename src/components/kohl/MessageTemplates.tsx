@@ -1,8 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  Plus, Search, Eye, Edit2, Trash2, Check, X, ChevronDown, ChevronUp,
-  MessageSquare, Link, Zap, RotateCcw, CheckCircle2, Send, FileText, Tag,
-} from 'lucide-react';
+import { Plus, Search, Eye, CreditCard as Edit2, Trash2, Check, X, ChevronDown, ChevronUp, MessageSquare, Link, Zap, RotateCcw, CheckCircle2, Send, FileText, Tag } from 'lucide-react';
 import {
   MessageTemplate,
   MessageTemplateCategory,
