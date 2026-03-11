@@ -149,6 +149,24 @@ export interface MessageButton {
   value: string;
 }
 
+export type LeadEntryChannel = 'whatsapp' | 'website' | 'landing_page' | 'campaign' | 'social' | 'referral' | 'offer' | 'reactivation';
+
+export interface LeadTracking {
+  entryChannel?: LeadEntryChannel;
+  originPage?: string;
+  originCourse?: string;
+  ctaClicked?: string;
+  campaignId?: string;
+  campaignName?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
+  referrer?: string;
+  capturedAt?: string;
+}
+
 export interface Lead {
   id: string;
   whatsappId: string;
@@ -170,6 +188,11 @@ export interface Lead {
   lastInteraction: string;
   interactions: Interaction[];
   customFields: Record<string, any>;
+  tracking?: LeadTracking;
+  commercialStatus?: 'open' | 'in_progress' | 'proposal_sent' | 'won' | 'lost';
+  operationalStatus?: 'bot_active' | 'human_assigned' | 'waiting' | 'enrolled';
+  lastCampaignId?: string;
+  lastCampaignName?: string;
 }
 
 export interface Interaction {

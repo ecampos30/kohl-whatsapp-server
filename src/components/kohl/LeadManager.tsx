@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, Plus, Star, MessageCircle, Calendar, MapPin, Bot, UserCheck, Loader2, Activity } from 'lucide-react';
-import { Lead, WhatsAppConnection } from '../../types/kohl-system';
+import { Search, Filter, Plus, Star, MessageCircle, Calendar, MapPin, Bot, UserCheck, Loader2, Activity, Globe, Tag, Megaphone, MousePointerClick, ChevronDown, ChevronUp } from 'lucide-react';
+import { Lead, WhatsAppConnection, LeadTracking, LeadEntryChannel } from '../../types/kohl-system';
 import {
   HandoffMap,
   HandoffEntry,
@@ -12,6 +12,11 @@ import {
 } from '../../services/handoffService';
 import { LeadMonitorBadge, MonitorAlertList } from './LeadMonitorBadge';
 import { supabase } from '../../lib/supabase';
+import {
+  getTrackingFromSession,
+  entryChannelLabel,
+  trackingToSourceLabel,
+} from '../../services/leadTrackingService';
 
 interface LeadManagerProps {
   leads: Lead[];
@@ -389,6 +394,8 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
                       )}
                     </div>
 
+                    <LeadTrackingPanel lead={lead} />
+
                     <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="text-sm text-gray-600">
@@ -462,16 +469,146 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
   );
 }
 
-// Add Lead Modal Component
-function AddLeadModal({ 
-  connections, 
-  onClose, 
-  onSave 
-}: { 
+function LeadTrackingPanel({ lead }: { lead: Lead }) {
+  const [expanded, setExpanded] = useState(false);
+  const t = lead.tracking;
+  const hasCampaign = lead.lastCampaignName || t?.campaignName;
+  const hasContext = t?.entryChannel || t?.originPage || t?.originCourse || t?.ctaClicked || hasCampaign || lead.commercialStatus || lead.operationalStatus;
+
+  if (!hasContext) return null;
+
+  return (
+    <div className="mt-3 border border-gray-100 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+      >
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contexto de Origem</span>
+        {expanded ? <ChevronUp className="h-3.5 w-3.5 text-gray-400" /> : <ChevronDown className="h-3.5 w-3.5 text-gray-400" />}
+      </button>
+
+      {expanded && (
+        <div className="px-3 py-2.5 space-y-2 bg-white">
+          {t?.entryChannel && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <Globe className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+              <span className="text-gray-400">Canal:</span>
+              <span className="font-medium text-gray-700">{entryChannelLabel(t.entryChannel)}</span>
+            </div>
+          )}
+          {t?.originPage && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <Globe className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+              <span className="text-gray-400">Pagina:</span>
+              <span className="font-medium text-gray-700 truncate max-w-[180px]" title={t.originPage}>{t.originPage}</span>
+            </div>
+          )}
+          {t?.originCourse && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <Tag className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+              <span className="text-gray-400">Curso:</span>
+              <span className="font-medium text-gray-700">{t.originCourse}</span>
+            </div>
+          )}
+          {t?.ctaClicked && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <MousePointerClick className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+              <span className="text-gray-400">CTA:</span>
+              <span className="font-medium text-gray-700">{t.ctaClicked}</span>
+            </div>
+          )}
+          {hasCampaign && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <Megaphone className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+              <span className="text-gray-400">Campanha:</span>
+              <span className="font-medium text-gray-700">{lead.lastCampaignName ?? t?.campaignName}</span>
+            </div>
+          )}
+          {(lead.commercialStatus || lead.operationalStatus) && (
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              {lead.commercialStatus && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${commercialStatusStyle(lead.commercialStatus)}`}>
+                  {commercialStatusLabel(lead.commercialStatus)}
+                </span>
+              )}
+              {lead.operationalStatus && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${operationalStatusStyle(lead.operationalStatus)}`}>
+                  {operationalStatusLabel(lead.operationalStatus)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function commercialStatusLabel(status: NonNullable<Lead['commercialStatus']>): string {
+  const labels: Record<NonNullable<Lead['commercialStatus']>, string> = {
+    open: 'Aberto',
+    in_progress: 'Em Andamento',
+    proposal_sent: 'Proposta Enviada',
+    won: 'Ganho',
+    lost: 'Perdido',
+  };
+  return labels[status];
+}
+
+function commercialStatusStyle(status: NonNullable<Lead['commercialStatus']>): string {
+  const styles: Record<NonNullable<Lead['commercialStatus']>, string> = {
+    open: 'bg-blue-100 text-blue-700',
+    in_progress: 'bg-yellow-100 text-yellow-700',
+    proposal_sent: 'bg-cyan-100 text-cyan-700',
+    won: 'bg-green-100 text-green-700',
+    lost: 'bg-red-100 text-red-700',
+  };
+  return styles[status];
+}
+
+function operationalStatusLabel(status: NonNullable<Lead['operationalStatus']>): string {
+  const labels: Record<NonNullable<Lead['operationalStatus']>, string> = {
+    bot_active: 'Bot Ativo',
+    human_assigned: 'Humano Atribuido',
+    waiting: 'Aguardando',
+    enrolled: 'Matriculado',
+  };
+  return labels[status];
+}
+
+function operationalStatusStyle(status: NonNullable<Lead['operationalStatus']>): string {
+  const styles: Record<NonNullable<Lead['operationalStatus']>, string> = {
+    bot_active: 'bg-green-100 text-green-700',
+    human_assigned: 'bg-amber-100 text-amber-700',
+    waiting: 'bg-gray-100 text-gray-600',
+    enrolled: 'bg-teal-100 text-teal-700',
+  };
+  return styles[status];
+}
+
+const ENTRY_CHANNELS: { value: LeadEntryChannel; label: string }[] = [
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'website', label: 'Site' },
+  { value: 'landing_page', label: 'Landing Page' },
+  { value: 'campaign', label: 'Campanha' },
+  { value: 'social', label: 'Redes Sociais' },
+  { value: 'referral', label: 'Indicacao' },
+  { value: 'offer', label: 'Oferta' },
+  { value: 'reactivation', label: 'Reativacao' },
+];
+
+function AddLeadModal({
+  connections,
+  onClose,
+  onSave
+}: {
   connections: WhatsAppConnection[];
   onClose: () => void;
   onSave: (lead: Lead) => void;
 }) {
+  const sessionTracking = getTrackingFromSession();
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -484,21 +621,52 @@ function AddLeadModal({
     notes: ''
   });
 
+  const [tracking, setTracking] = useState<Partial<LeadTracking>>({
+    entryChannel: sessionTracking?.entryChannel ?? undefined,
+    originPage: sessionTracking?.originPage ?? '',
+    originCourse: sessionTracking?.originCourse ?? '',
+    ctaClicked: sessionTracking?.ctaClicked ?? '',
+    campaignName: sessionTracking?.campaignName ?? '',
+    utmSource: sessionTracking?.utmSource ?? '',
+    utmCampaign: sessionTracking?.utmCampaign ?? '',
+  });
+
+  const [showOriginSection, setShowOriginSection] = useState(
+    !!(sessionTracking?.entryChannel || sessionTracking?.originPage || sessionTracking?.originCourse)
+  );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const cleanTracking: LeadTracking = {
+      ...sessionTracking,
+      entryChannel: tracking.entryChannel,
+      originPage: tracking.originPage || undefined,
+      originCourse: tracking.originCourse || undefined,
+      ctaClicked: tracking.ctaClicked || undefined,
+      campaignName: tracking.campaignName || undefined,
+      utmSource: tracking.utmSource || undefined,
+      utmCampaign: tracking.utmCampaign || undefined,
+      capturedAt: sessionTracking?.capturedAt ?? new Date().toISOString(),
+    };
+
+    const hasTracking = Object.values(cleanTracking).some(v => v !== undefined && v !== '');
+
     const newLead: Lead = {
       id: Date.now().toString(),
       ...formData,
       tags: [],
-      score: 50, // Default score
+      score: 50,
       stage: 'new',
       createdAt: new Date().toISOString(),
       lastInteraction: new Date().toISOString(),
       interactions: [],
-      customFields: {}
+      customFields: {},
+      tracking: hasTracking ? cleanTracking : undefined,
+      lastCampaignName: tracking.campaignName || undefined,
+      lastCampaignId: tracking.campaignId || sessionTracking?.campaignId || undefined,
     };
-    
+
     onSave(newLead);
   };
 
@@ -506,9 +674,9 @@ function AddLeadModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-900">Add New Lead</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            ×
+          <h2 className="text-xl font-semibold text-gray-900">Adicionar Lead</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">
+            &times;
           </button>
         </div>
 
@@ -516,7 +684,7 @@ function AddLeadModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name *
+                Nome Completo *
               </label>
               <input
                 type="text"
@@ -530,7 +698,7 @@ function AddLeadModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number *
+                Telefone *
               </label>
               <input
                 type="tel"
@@ -559,7 +727,7 @@ function AddLeadModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                WhatsApp Number
+                Conexao WhatsApp
               </label>
               <select
                 value={formData.whatsappId}
@@ -578,20 +746,20 @@ function AddLeadModal({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                City
+                Cidade
               </label>
               <input
                 type="text"
                 value={formData.city}
                 onChange={(e) => setFormData({...formData, city: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="São Paulo"
+                placeholder="Sao Paulo"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                State
+                Estado
               </label>
               <input
                 type="text"
@@ -604,33 +772,147 @@ function AddLeadModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Source
+                Origem
               </label>
               <select
                 value={formData.source}
                 onChange={(e) => setFormData({...formData, source: e.target.value as Lead['source']})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="organic">Organic</option>
-                <option value="campaign">Campaign</option>
-                <option value="referral">Referral</option>
-                <option value="social">Social Media</option>
-                <option value="website">Website</option>
+                <option value="organic">Organico</option>
+                <option value="campaign">Campanha</option>
+                <option value="referral">Indicacao</option>
+                <option value="social">Redes Sociais</option>
+                <option value="website">Site</option>
               </select>
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes
+              Notas
             </label>
             <textarea
               value={formData.notes}
               onChange={(e) => setFormData({...formData, notes: e.target.value})}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Additional notes about this lead..."
+              placeholder="Informacoes adicionais sobre este lead..."
             />
+          </div>
+
+          {/* Origin context section */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowOriginSection(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Contexto de Origem</span>
+                {sessionTracking && (
+                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                    Pre-preenchido
+                  </span>
+                )}
+              </div>
+              {showOriginSection
+                ? <ChevronUp className="h-4 w-4 text-gray-400" />
+                : <ChevronDown className="h-4 w-4 text-gray-400" />
+              }
+            </button>
+
+            {showOriginSection && (
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Canal de Entrada
+                    </label>
+                    <select
+                      value={tracking.entryChannel ?? ''}
+                      onChange={(e) => setTracking({ ...tracking, entryChannel: e.target.value as LeadEntryChannel || undefined })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Nao definido</option>
+                      {ENTRY_CHANNELS.map(ch => (
+                        <option key={ch.value} value={ch.value}>{ch.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Pagina de Origem
+                    </label>
+                    <input
+                      type="text"
+                      value={tracking.originPage ?? ''}
+                      onChange={(e) => setTracking({ ...tracking, originPage: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="ex: /curso-microblading"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Curso de Interesse
+                    </label>
+                    <input
+                      type="text"
+                      value={tracking.originCourse ?? ''}
+                      onChange={(e) => setTracking({ ...tracking, originCourse: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="ex: Microblading Avancado"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      CTA Clicado
+                    </label>
+                    <input
+                      type="text"
+                      value={tracking.ctaClicked ?? ''}
+                      onChange={(e) => setTracking({ ...tracking, ctaClicked: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="ex: Quero me inscrever"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Campanha Associada
+                    </label>
+                    <input
+                      type="text"
+                      value={tracking.campaignName ?? ''}
+                      onChange={(e) => setTracking({ ...tracking, campaignName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="ex: Black Friday 2025"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      UTM Source
+                    </label>
+                    <input
+                      type="text"
+                      value={tracking.utmSource ?? ''}
+                      onChange={(e) => setTracking({ ...tracking, utmSource: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="ex: instagram"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end space-x-3">
@@ -639,13 +921,13 @@ function AddLeadModal({
               onClick={onClose}
               className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
-              Cancel
+              Cancelar
             </button>
             <button
               type="submit"
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
             >
-              Add Lead
+              Adicionar Lead
             </button>
           </div>
         </form>
