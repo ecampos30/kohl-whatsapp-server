@@ -1,6 +1,16 @@
-import React, { useState } from 'react';
-import { Search, Filter, Plus, Star, MessageCircle, Calendar, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Filter, Plus, Star, MessageCircle, Calendar, MapPin, Bot, UserCheck, Loader2 } from 'lucide-react';
 import { Lead, WhatsAppConnection } from '../../types/kohl-system';
+import {
+  HandoffMap,
+  HandoffEntry,
+  getHandoffMap,
+  pauseContact,
+  resumeContact,
+  isContactPausedInMap,
+  getExpiryLabel,
+} from '../../services/handoffService';
+import { supabase } from '../../lib/supabase';
 
 interface LeadManagerProps {
   leads: Lead[];
@@ -8,10 +18,100 @@ interface LeadManagerProps {
   onSave: (leads: Lead[]) => void;
 }
 
+function useHandoff(connections: WhatsAppConnection[]) {
+  const [handoffMap, setHandoffMap] = useState<HandoffMap>({});
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [loadingJid, setLoadingJid] = useState<string | null>(null);
+
+  const resolveConnection = useCallback(async () => {
+    if (connections.length > 0) {
+      const conn = connections[0];
+      setConnectionId(conn.id);
+      const { data } = await supabase
+        .from('whatsapp_connections')
+        .select('client_id')
+        .eq('id', conn.id)
+        .maybeSingle();
+      setClientId(data?.client_id ?? null);
+      return { connectionId: conn.id, clientId: data?.client_id ?? null };
+    }
+    const { data } = await supabase
+      .from('whatsapp_connections')
+      .select('id, client_id')
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      setConnectionId(data.id);
+      setClientId(data.client_id);
+      return { connectionId: data.id, clientId: data.client_id };
+    }
+    return { connectionId: null, clientId: null };
+  }, [connections]);
+
+  const refresh = useCallback(async (cid?: string) => {
+    const id = cid ?? connectionId;
+    if (!id) return;
+    const map = await getHandoffMap(id);
+    setHandoffMap(map);
+  }, [connectionId]);
+
+  useEffect(() => {
+    resolveConnection().then(({ connectionId: cid }) => {
+      if (cid) refresh(cid);
+    });
+  }, [resolveConnection, refresh]);
+
+  const getLeadEntry = useCallback((phone: string): HandoffEntry | null => {
+    const jid = phone.includes('@') ? phone : `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
+    return handoffMap[jid] ?? handoffMap[phone] ?? null;
+  }, [handoffMap]);
+
+  const isLeadPaused = useCallback((phone: string): boolean => {
+    const jid = phone.includes('@') ? phone : `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
+    return isContactPausedInMap(handoffMap, jid) || isContactPausedInMap(handoffMap, phone);
+  }, [handoffMap]);
+
+  const pause = useCallback(async (phone: string) => {
+    let cid = connectionId;
+    let clt = clientId;
+    if (!cid || !clt) {
+      const resolved = await resolveConnection();
+      cid = resolved.connectionId;
+      clt = resolved.clientId;
+    }
+    if (!cid || !clt) return;
+    const jid = phone.includes('@') ? phone : `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
+    setLoadingJid(jid);
+    await pauseContact(cid, clt, jid, 'panel');
+    await refresh(cid);
+    setLoadingJid(null);
+  }, [connectionId, clientId, resolveConnection, refresh]);
+
+  const resume = useCallback(async (phone: string) => {
+    let cid = connectionId;
+    let clt = clientId;
+    if (!cid || !clt) {
+      const resolved = await resolveConnection();
+      cid = resolved.connectionId;
+      clt = resolved.clientId;
+    }
+    if (!cid || !clt) return;
+    const jid = phone.includes('@') ? phone : `${phone.replace(/\D/g, '')}@s.whatsapp.net`;
+    setLoadingJid(jid);
+    await resumeContact(cid, clt, jid);
+    await refresh(cid);
+    setLoadingJid(null);
+  }, [connectionId, clientId, resolveConnection, refresh]);
+
+  return { isLeadPaused, getLeadEntry, pause, resume, loadingJid, handoffMap };
+}
+
 export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStage, setSelectedStage] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const { isLeadPaused, getLeadEntry, pause, resume, loadingJid, handoffMap } = useHandoff(connections);
 
   const stages = [
     { id: 'all', label: 'All Leads', color: 'gray' },
@@ -48,7 +148,15 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Lead Management</h2>
-          <p className="text-gray-600">Track and manage your beauty course leads</p>
+          <p className="text-gray-600">
+            Track and manage your beauty course leads
+            {Object.values(handoffMap).filter(e => e.paused && new Date(e.expires_at) > new Date()).length > 0 && (
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                <UserCheck className="h-3 w-3 mr-1" />
+                {Object.values(handoffMap).filter(e => e.paused && new Date(e.expires_at) > new Date()).length} em atendimento humano
+              </span>
+            )}
+          </p>
         </div>
         
         <button
@@ -127,23 +235,41 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredLeads.map((lead) => (
-            <div key={lead.id} className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+          {filteredLeads.map((lead) => {
+            const paused = isLeadPaused(lead.phone);
+            const entry = getLeadEntry(lead.phone);
+            const jid = lead.phone.includes('@') ? lead.phone : `${lead.phone.replace(/\D/g, '')}@s.whatsapp.net`;
+            const isLoading = loadingJid === jid || loadingJid === lead.phone;
+            return (
+            <div key={lead.id} className={`bg-white rounded-xl p-6 border transition-shadow hover:shadow-lg ${paused ? 'border-amber-300' : 'border-gray-200'}`}>
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{lead.name}</h3>
                   <p className="text-gray-600">{lead.phone}</p>
                   {lead.email && <p className="text-sm text-gray-500">{lead.email}</p>}
                 </div>
-                
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScoreColor(lead.score)}`}>
-                    <Star className="h-3 w-3 inline mr-1" />
-                    {lead.score}
-                  </span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStageColor(lead.stage)}`}>
-                    {lead.stage}
-                  </span>
+
+                <div className="flex flex-col items-end space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScoreColor(lead.score)}`}>
+                      <Star className="h-3 w-3 inline mr-1" />
+                      {lead.score}
+                    </span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStageColor(lead.stage)}`}>
+                      {lead.stage}
+                    </span>
+                  </div>
+                  {paused && entry ? (
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 ${entry && (new Date(entry.expires_at).getTime() - Date.now()) < 10 * 60 * 1000 ? 'animate-pulse' : ''}`}>
+                      <UserCheck className="h-3 w-3 mr-1" />
+                      HUMANO &bull; {getExpiryLabel(entry)}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                      <Bot className="h-3 w-3 mr-1" />
+                      BOT ATIVO
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -200,27 +326,60 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
                 )}
               </div>
 
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                <div className="text-sm text-gray-600">
-                  Origem: <span className="font-medium capitalize">
-                    {lead.source === 'organic' ? 'Orgânico' :
-                     lead.source === 'campaign' ? 'Campanha' :
-                     lead.source === 'referral' ? 'Indicação' :
-                     lead.source === 'social' ? 'Redes Sociais' : 'Site'}
-                  </span>
+              <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Origem: <span className="font-medium capitalize">
+                      {lead.source === 'organic' ? 'Orgânico' :
+                       lead.source === 'campaign' ? 'Campanha' :
+                       lead.source === 'referral' ? 'Indicação' :
+                       lead.source === 'social' ? 'Redes Sociais' : 'Site'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                      <MessageCircle className="h-4 w-4" />
+                    </button>
+                    <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                      Ver Detalhes
+                    </button>
+                  </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
-                  <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
-                    <MessageCircle className="h-4 w-4" />
-                  </button>
-                  <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    Ver Detalhes
-                  </button>
+                  {paused ? (
+                    <button
+                      onClick={() => resume(lead.phone)}
+                      disabled={isLoading}
+                      className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Bot className="h-4 w-4" />
+                      )}
+                      <span>Reativar Bot</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => pause(lead.phone)}
+                      disabled={isLoading}
+                      className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium transition-colors disabled:opacity-60"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserCheck className="h-4 w-4" />
+                      )}
+                      <span>Assumir Atendimento</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
