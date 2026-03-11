@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, Plus, Star, MessageCircle, Calendar, MapPin, Bot, UserCheck, Loader2 } from 'lucide-react';
+import { Search, Filter, Plus, Star, MessageCircle, Calendar, MapPin, Bot, UserCheck, Loader2, Activity } from 'lucide-react';
 import { Lead, WhatsAppConnection } from '../../types/kohl-system';
 import {
   HandoffMap,
@@ -10,6 +10,7 @@ import {
   isContactPausedInMap,
   getExpiryLabel,
 } from '../../services/handoffService';
+import { LeadMonitorBadge, MonitorAlertList } from './LeadMonitorBadge';
 import { supabase } from '../../lib/supabase';
 
 interface LeadManagerProps {
@@ -107,10 +108,14 @@ function useHandoff(connections: WhatsAppConnection[]) {
   return { isLeadPaused, getLeadEntry, pause, resume, loadingJid, handoffMap };
 }
 
+type ActiveTab = 'leads' | 'monitor';
+
 export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStage, setSelectedStage] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('leads');
+  const [showOnlyAlerts, setShowOnlyAlerts] = useState(false);
   const { isLeadPaused, getLeadEntry, pause, resume, loadingJid, handoffMap } = useHandoff(connections);
 
   const stages = [
@@ -127,8 +132,13 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
     const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          lead.phone.includes(searchTerm);
     const matchesStage = selectedStage === 'all' || lead.stage === selectedStage;
-    return matchesSearch && matchesStage;
+    const matchesAlert = !showOnlyAlerts || isLeadPaused(lead.phone);
+    return matchesSearch && matchesStage && matchesAlert;
   });
+
+  const pausedCount = Object.values(handoffMap).filter(
+    (e) => e.paused && new Date(e.expires_at) > new Date()
+  ).length;
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600 bg-green-100';
@@ -148,17 +158,9 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Lead Management</h2>
-          <p className="text-gray-600">
-            Track and manage your beauty course leads
-            {Object.values(handoffMap).filter(e => e.paused && new Date(e.expires_at) > new Date()).length > 0 && (
-              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                <UserCheck className="h-3 w-3 mr-1" />
-                {Object.values(handoffMap).filter(e => e.paused && new Date(e.expires_at) > new Date()).length} em atendimento humano
-              </span>
-            )}
-          </p>
+          <p className="text-gray-600">Track and manage your beauty course leads</p>
         </div>
-        
+
         <button
           onClick={() => setShowAddModal(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
@@ -168,219 +170,282 @@ export function LeadManager({ leads, connections, onSave }: LeadManagerProps) {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl p-4 border border-gray-200">
-        <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search leads by name or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <select
-              value={selectedStage}
-              onChange={(e) => setSelectedStage(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {stages.map((stage) => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('leads')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'leads'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <MessageCircle className="h-4 w-4" />
+          Leads
+        </button>
+        <button
+          onClick={() => setActiveTab('monitor')}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'monitor'
+              ? 'border-amber-500 text-amber-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <Activity className="h-4 w-4" />
+          Monitor
+          <LeadMonitorBadge handoffMap={handoffMap} />
+        </button>
       </div>
 
-      {/* Lead Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stages.slice(1).map((stage) => {
-          const count = leads.filter(lead => lead.stage === stage.id).length;
-          return (
-            <div key={stage.id} className="bg-white rounded-lg p-4 border border-gray-200">
-              <div className="text-2xl font-bold text-gray-900">{count}</div>
-              <div className="text-sm text-gray-600">{stage.label}</div>
+      {activeTab === 'monitor' && (
+        <div className="bg-white rounded-xl p-6 border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Atendimentos Humanos Ativos</h3>
+              <p className="text-sm text-gray-500">Leads com bot pausado aguardando retomada</p>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Leads List */}
-      {filteredLeads.length === 0 ? (
-        <div className="bg-white rounded-xl p-12 border border-gray-200 text-center">
-          <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
-          <p className="text-gray-600 mb-6">
-            {searchTerm || selectedStage !== 'all' 
-              ? 'Try adjusting your search or filters'
-              : 'Start by adding your first lead or connecting WhatsApp to receive leads automatically'
-            }
-          </p>
-          {!searchTerm && selectedStage === 'all' && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 mx-auto transition-colors"
-            >
-              <Plus className="h-5 w-5" />
-              <span>Add First Lead</span>
-            </button>
-          )}
+            {pausedCount > 0 && (
+              <span className="text-sm text-amber-700 font-medium bg-amber-50 border border-amber-200 px-3 py-1 rounded-full">
+                {pausedCount} ativo{pausedCount !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <MonitorAlertList handoffMap={handoffMap} />
         </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredLeads.map((lead) => {
-            const paused = isLeadPaused(lead.phone);
-            const entry = getLeadEntry(lead.phone);
-            const jid = lead.phone.includes('@') ? lead.phone : `${lead.phone.replace(/\D/g, '')}@s.whatsapp.net`;
-            const isLoading = loadingJid === jid || loadingJid === lead.phone;
-            return (
-            <div key={lead.id} className={`bg-white rounded-xl p-6 border transition-shadow hover:shadow-lg ${paused ? 'border-amber-300' : 'border-gray-200'}`}>
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{lead.name}</h3>
-                  <p className="text-gray-600">{lead.phone}</p>
-                  {lead.email && <p className="text-sm text-gray-500">{lead.email}</p>}
-                </div>
+      )}
 
-                <div className="flex flex-col items-end space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScoreColor(lead.score)}`}>
-                      <Star className="h-3 w-3 inline mr-1" />
-                      {lead.score}
-                    </span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStageColor(lead.stage)}`}>
-                      {lead.stage}
-                    </span>
-                  </div>
-                  {paused && entry ? (
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 ${entry && (new Date(entry.expires_at).getTime() - Date.now()) < 10 * 60 * 1000 ? 'animate-pulse' : ''}`}>
-                      <UserCheck className="h-3 w-3 mr-1" />
-                      HUMANO &bull; {getExpiryLabel(entry)}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
-                      <Bot className="h-3 w-3 mr-1" />
-                      BOT ATIVO
-                    </span>
-                  )}
-                </div>
+      {activeTab === 'leads' && (
+        <>
+          {/* Filters */}
+          <div className="bg-white rounded-xl p-4 border border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search leads by name or phone..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
               </div>
 
-              <div className="space-y-3">
-                {(lead.city || lead.state) && (
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <MapPin className="h-4 w-4" />
-                    <span>{lead.city}{lead.city && lead.state && ', '}{lead.state}</span>
-                  </div>
-                )}
+              <div className="flex items-center space-x-2">
+                <Filter className="h-4 w-4 text-gray-400" />
+                <select
+                  value={selectedStage}
+                  onChange={(e) => setSelectedStage(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  {stages.map((stage) => (
+                    <option key={stage.id} value={stage.id}>
+                      {stage.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Calendar className="h-4 w-4" />
-                  <span>Último contato: {new Date(lead.lastInteraction).toLocaleDateString('pt-BR')}</span>
+              {pausedCount > 0 && (
+                <button
+                  onClick={() => setShowOnlyAlerts((v) => !v)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                    showOnlyAlerts
+                      ? 'bg-amber-100 border-amber-300 text-amber-800'
+                      : 'bg-white border-gray-300 text-gray-600 hover:border-amber-300 hover:text-amber-700'
+                  }`}
+                >
+                  <UserCheck className="h-4 w-4" />
+                  Somente alertas
+                  <LeadMonitorBadge handoffMap={handoffMap} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Lead Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {stages.slice(1).map((stage) => {
+              const count = leads.filter(lead => lead.stage === stage.id).length;
+              return (
+                <div key={stage.id} className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="text-2xl font-bold text-gray-900">{count}</div>
+                  <div className="text-sm text-gray-600">{stage.label}</div>
                 </div>
+              );
+            })}
+          </div>
 
-                {lead.interestedCourses.length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium text-gray-700 mb-1">Cursos de Interesse:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {lead.interestedCourses.slice(0, 2).map((courseId) => (
-                        <span key={courseId} className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
-                          {courseId.replace('-', ' ')}
-                        </span>
-                      ))}
-                      {lead.interestedCourses.length > 2 && (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                          +{lead.interestedCourses.length - 2} mais
-                        </span>
+          {/* Leads List */}
+          {filteredLeads.length === 0 ? (
+            <div className="bg-white rounded-xl p-12 border border-gray-200 text-center">
+              <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No leads found</h3>
+              <p className="text-gray-600 mb-6">
+                {searchTerm || selectedStage !== 'all' || showOnlyAlerts
+                  ? 'Try adjusting your search or filters'
+                  : 'Start by adding your first lead or connecting WhatsApp to receive leads automatically'
+                }
+              </p>
+              {!searchTerm && selectedStage === 'all' && !showOnlyAlerts && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center space-x-2 mx-auto transition-colors"
+                >
+                  <Plus className="h-5 w-5" />
+                  <span>Add First Lead</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {filteredLeads.map((lead) => {
+                const paused = isLeadPaused(lead.phone);
+                const entry = getLeadEntry(lead.phone);
+                const jid = lead.phone.includes('@') ? lead.phone : `${lead.phone.replace(/\D/g, '')}@s.whatsapp.net`;
+                const isLoading = loadingJid === jid || loadingJid === lead.phone;
+                return (
+                  <div key={lead.id} className={`bg-white rounded-xl p-6 border transition-shadow hover:shadow-lg ${paused ? 'border-amber-300' : 'border-gray-200'}`}>
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">{lead.name}</h3>
+                        <p className="text-gray-600">{lead.phone}</p>
+                        {lead.email && <p className="text-sm text-gray-500">{lead.email}</p>}
+                      </div>
+
+                      <div className="flex flex-col items-end space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScoreColor(lead.score)}`}>
+                            <Star className="h-3 w-3 inline mr-1" />
+                            {lead.score}
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStageColor(lead.stage)}`}>
+                            {lead.stage}
+                          </span>
+                        </div>
+                        {paused && entry ? (
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 ${(new Date(entry.expires_at).getTime() - Date.now()) < 10 * 60 * 1000 ? 'animate-pulse' : ''}`}>
+                            <UserCheck className="h-3 w-3 mr-1" />
+                            HUMANO &bull; {getExpiryLabel(entry)}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                            <Bot className="h-3 w-3 mr-1" />
+                            BOT ATIVO
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(lead.city || lead.state) && (
+                        <div className="flex items-center space-x-2 text-sm text-gray-600">
+                          <MapPin className="h-4 w-4" />
+                          <span>{lead.city}{lead.city && lead.state && ', '}{lead.state}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <Calendar className="h-4 w-4" />
+                        <span>Ultimo contato: {new Date(lead.lastInteraction).toLocaleDateString('pt-BR')}</span>
+                      </div>
+
+                      {lead.interestedCourses.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 mb-1">Cursos de Interesse:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {lead.interestedCourses.slice(0, 2).map((courseId) => (
+                              <span key={courseId} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                {courseId.replace('-', ' ')}
+                              </span>
+                            ))}
+                            {lead.interestedCourses.length > 2 && (
+                              <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                                +{lead.interestedCourses.length - 2} mais
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {lead.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {lead.tags.slice(0, 3).map((tag) => (
+                            <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                              {tag}
+                            </span>
+                          ))}
+                          {lead.tags.length > 3 && (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
+                              +{lead.tags.length - 3} mais
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {lead.notes && (
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-sm text-gray-700 line-clamp-2">{lead.notes}</p>
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
 
-                {lead.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {lead.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                        {tag}
-                      </span>
-                    ))}
-                    {lead.tags.length > 3 && (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                        +{lead.tags.length - 3} mais
-                      </span>
-                    )}
-                  </div>
-                )}
+                    <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-600">
+                          Origem: <span className="font-medium capitalize">
+                            {lead.source === 'organic' ? 'Organico' :
+                             lead.source === 'campaign' ? 'Campanha' :
+                             lead.source === 'referral' ? 'Indicacao' :
+                             lead.source === 'social' ? 'Redes Sociais' : 'Site'}
+                          </span>
+                        </div>
 
-                {lead.notes && (
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <p className="text-sm text-gray-700 line-clamp-2">{lead.notes}</p>
-                  </div>
-                )}
-              </div>
+                        <div className="flex items-center space-x-2">
+                          <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                            <MessageCircle className="h-4 w-4" />
+                          </button>
+                          <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                            Ver Detalhes
+                          </button>
+                        </div>
+                      </div>
 
-              <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    Origem: <span className="font-medium capitalize">
-                      {lead.source === 'organic' ? 'Orgânico' :
-                       lead.source === 'campaign' ? 'Campanha' :
-                       lead.source === 'referral' ? 'Indicação' :
-                       lead.source === 'social' ? 'Redes Sociais' : 'Site'}
-                    </span>
+                      <div className="flex items-center space-x-2">
+                        {paused ? (
+                          <button
+                            onClick={() => resume(lead.phone)}
+                            disabled={isLoading}
+                            className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
+                          >
+                            {isLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Bot className="h-4 w-4" />
+                            )}
+                            <span>Reativar Bot</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => pause(lead.phone)}
+                            disabled={isLoading}
+                            className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium transition-colors disabled:opacity-60"
+                          >
+                            {isLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <UserCheck className="h-4 w-4" />
+                            )}
+                            <span>Assumir Atendimento</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-
-                  <div className="flex items-center space-x-2">
-                    <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
-                      <MessageCircle className="h-4 w-4" />
-                    </button>
-                    <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                      Ver Detalhes
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  {paused ? (
-                    <button
-                      onClick={() => resume(lead.phone)}
-                      disabled={isLoading}
-                      className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors disabled:opacity-60"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Bot className="h-4 w-4" />
-                      )}
-                      <span>Reativar Bot</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => pause(lead.phone)}
-                      disabled={isLoading}
-                      className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium transition-colors disabled:opacity-60"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <UserCheck className="h-4 w-4" />
-                      )}
-                      <span>Assumir Atendimento</span>
-                    </button>
-                  )}
-                </div>
-              </div>
+                );
+              })}
             </div>
-            );
-          })}
-        </div>
+          )}
+        </>
       )}
 
       {showAddModal && (
