@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Play, Pause, Edit3, Trash2, Calendar, Users, MessageSquare, X } from 'lucide-react';
+import { Plus, Play, Pause, CreditCard as Edit3, Trash2, Calendar, Users, MessageSquare, X } from 'lucide-react';
 import { Campaign, WhatsAppConnection } from '../../types/kohl-system';
 
 interface CampaignManagerProps {
