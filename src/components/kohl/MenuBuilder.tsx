@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Edit3, Trash2, Save, Eye, MessageSquare } from 'lucide-react';
+import { SaveToast } from '../ui/StateViews';
 import { MenuTemplate, MenuOption, CourseInfo } from '../../types/kohl-system';
 import { kohlCourses } from '../../data/kohl-courses';
 
@@ -12,6 +13,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
   const [localMenu, setLocalMenu] = useState(menu);
   const [previewMode, setPreviewMode] = useState(false);
   const [editingOption, setEditingOption] = useState<string | null>(null);
+  const [saveToast, setSaveToast] = useState(false);
 
   const addOption = () => {
     const newOption: MenuOption = {
@@ -45,6 +47,8 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
 
   const handleSave = () => {
     onSave(localMenu);
+    setSaveToast(true);
+    setTimeout(() => setSaveToast(false), 3000);
   };
 
   const renderPreview = () => {
@@ -81,31 +85,33 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
 
   return (
     <div className="space-y-6">
+      <SaveToast visible={saveToast} message="Menu salvo com sucesso" />
+
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Construtor de Menu</h2>
-          <p className="text-gray-600">Personalize seu menu de boas-vindas do WhatsApp</p>
+          <h2 className="text-lg font-semibold text-gray-900">Construtor de Menu</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Personalize seu menu de boas-vindas do WhatsApp</p>
         </div>
-        
-        <div className="flex items-center space-x-3">
+
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setPreviewMode(!previewMode)}
-            className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
-              previewMode 
-                ? 'bg-gray-600 hover:bg-gray-700 text-white' 
+            className={`inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors ${
+              previewMode
+                ? 'bg-gray-900 hover:bg-gray-800 text-white'
                 : 'border border-gray-300 hover:bg-gray-50 text-gray-700'
             }`}
           >
             <Eye className="h-4 w-4" />
-            <span>{previewMode ? 'Modo Edição' : 'Visualizar'}</span>
+            {previewMode ? 'Modo Edicao' : 'Visualizar'}
           </button>
-          
+
           <button
             onClick={handleSave}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             <Save className="h-4 w-4" />
-            <span>Salvar Menu</span>
+            Salvar Menu
           </button>
         </div>
       </div>
@@ -126,7 +132,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
                 value={localMenu.welcomeMessage}
                 onChange={(e) => setLocalMenu({...localMenu, welcomeMessage: e.target.value})}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 placeholder="{{name}}, welcome to Kohl 👋&#10;&#10;Select the number for your course of interest:"
               />
               <p className="text-xs text-gray-500 mt-1">
@@ -142,7 +148,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
                 value={localMenu.fallbackMessage}
                 onChange={(e) => setLocalMenu({...localMenu, fallbackMessage: e.target.value})}
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 placeholder="Desculpe, não entendi essa opção..."
               />
             </div>
@@ -151,7 +157,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
               <h3 className="text-lg font-medium text-gray-900">Opções do Menu</h3>
               <button
                 onClick={addOption}
-                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg flex items-center space-x-1 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
               >
                 <Plus className="h-4 w-4" />
                 <span>Adicionar Opção</span>
@@ -163,7 +169,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
                 <div key={option.id} className="bg-white border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                      <span className="w-6 h-6 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-sm font-medium">
+                      <span className="w-6 h-6 bg-gray-100 text-gray-700 rounded-full flex items-center justify-center text-sm font-medium">
                         {option.number}
                       </span>
                       <span className="font-medium text-gray-900">{option.text}</span>
@@ -196,7 +202,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
                             type="text"
                             value={option.number}
                             onChange={(e) => updateOption(option.id, { number: e.target.value })}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-rose-500 focus:border-transparent"
                           />
                         </div>
                         
@@ -207,7 +213,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
                           <select
                             value={option.action}
                             onChange={(e) => updateOption(option.id, { action: e.target.value as any })}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-rose-500 focus:border-transparent"
                           >
                             <option value="course_info">Info do Curso</option>
                             <option value="sub_menu">Sub Menu</option>
@@ -225,7 +231,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
                           type="text"
                           value={option.text}
                           onChange={(e) => updateOption(option.id, { text: e.target.value })}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-rose-500 focus:border-transparent"
                         />
                       </div>
 
@@ -237,7 +243,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
                           <select
                             value={option.courseId || ''}
                             onChange={(e) => updateOption(option.id, { courseId: e.target.value })}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-rose-500 focus:border-transparent"
                           >
                             <option value="">Selecionar Curso</option>
                             {kohlCourses.map((course) => (
@@ -258,7 +264,7 @@ export function MenuBuilder({ menu, onSave }: MenuBuilderProps) {
                             value={option.customResponse || ''}
                             onChange={(e) => updateOption(option.id, { customResponse: e.target.value })}
                             rows={2}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-rose-500 focus:border-transparent"
                             placeholder="Digite a mensagem de resposta personalizada..."
                           />
                         </div>

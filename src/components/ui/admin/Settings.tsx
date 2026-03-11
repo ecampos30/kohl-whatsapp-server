@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Save, Shield, Clock, Bell, Database, Webhook, Key, Globe, QrCode, Smartphone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Save, Shield, Clock, Bell, Database, Webhook, Key, Globe, QrCode, Smartphone, CheckCircle, AlertTriangle } from 'lucide-react';
 import { WhatsAppConnectionConfig } from '../../config/connections';
 import { SessionSelector } from '../../kohl/SessionSelector';
 import { WhatsAppConnection } from '../../types/kohl-system';
+import { SaveToast } from '../StateViews';
 
 interface SettingsProps {
   connections: WhatsAppConnectionConfig[];
@@ -14,6 +15,7 @@ interface SettingsProps {
 
 export function Settings({ connections, onSave, kohlConnections, selectedConnectionId, onSelectConnection }: SettingsProps) {
   const [activeTab, setActiveTab] = useState(kohlConnections ? 'session' : 'whatsapp');
+  const [saveToast, setSaveToast] = useState(false);
   const [settings, setSettings] = useState({
     whatsapp: {
       fallbackMode: 'auto_fallback' as 'web_only' | 'api_only' | 'auto_fallback',
@@ -69,24 +71,26 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
   ];
 
   const handleSave = () => {
-    console.log('Salvando configurações:', settings);
-    // Em implementação real, salvar no backend
+    setSaveToast(true);
+    setTimeout(() => setSaveToast(false), 3000);
   };
 
   return (
     <div className="space-y-6">
+      <SaveToast visible={saveToast} message="Configuracoes salvas com sucesso" />
+
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Configurações do Sistema</h2>
-          <p className="text-gray-600">Configure seu Gerenciador de Bot WhatsApp</p>
+          <h2 className="text-lg font-semibold text-gray-900">Configuracoes do Sistema</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Configure seu Gerenciador de Bot WhatsApp</p>
         </div>
-        
+
         <button
           onClick={handleSave}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+          className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           <Save className="h-4 w-4" />
-          <span>Salvar Alterações</span>
+          Salvar Alteracoes
         </button>
       </div>
 
@@ -101,7 +105,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                   onClick={() => setActiveTab(tab.id)}
                   className={`py-4 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
+                      ? 'border-rose-500 text-rose-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
@@ -114,12 +118,26 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
         </div>
 
         <div className="p-6">
-          {activeTab === 'session' && kohlConnections && onSelectConnection && selectedConnectionId !== undefined && (
-            <SessionSelector
-              connections={kohlConnections}
-              selectedConnectionId={selectedConnectionId}
-              onSelect={onSelectConnection}
-            />
+          {activeTab === 'session' && (
+            <>
+              {kohlConnections && onSelectConnection && selectedConnectionId !== undefined ? (
+                <SessionSelector
+                  connections={kohlConnections}
+                  selectedConnectionId={selectedConnectionId}
+                  onSelect={onSelectConnection}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-14 text-center">
+                  <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <AlertTriangle className="h-6 w-6 text-amber-500" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Sessao nao disponivel</h3>
+                  <p className="text-sm text-gray-500 max-w-xs">
+                    Nenhuma conexao WhatsApp foi encontrada. Configure uma conexao na secao <strong>Conexoes WhatsApp</strong> primeiro.
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           {activeTab === 'whatsapp' && (
@@ -195,7 +213,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                     ...settings,
                     whatsapp: { ...settings.whatsapp, fallbackMode: e.target.value as any }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 >
                   <option value="auto_fallback">Auto Fallback (Recomendado)</option>
                   <option value="web_only">Apenas WhatsApp Web</option>
@@ -220,7 +238,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                       ...settings,
                       whatsapp: { ...settings.whatsapp, qrCodeTimeout: parseInt(e.target.value) }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                   />
                 </div>
 
@@ -237,7 +255,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                       ...settings,
                       whatsapp: { ...settings.whatsapp, apiTimeout: parseInt(e.target.value) }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                   />
                 </div>
 
@@ -254,7 +272,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                       ...settings,
                       whatsapp: { ...settings.whatsapp, retryAttempts: parseInt(e.target.value) }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -283,7 +301,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                     ...settings,
                     businessInfo: { ...settings.businessInfo, name: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 />
               </div>
 
@@ -297,7 +315,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                     ...settings,
                     businessInfo: { ...settings.businessInfo, timezone: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 >
                   <option value="America/Sao_Paulo">São Paulo (GMT-3)</option>
                   <option value="America/New_York">New York (GMT-5)</option>
@@ -323,7 +341,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                           businessHours: { ...settings.businessInfo.businessHours, start: e.target.value }
                         }
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     />
                   </div>
                   
@@ -339,7 +357,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                           businessHours: { ...settings.businessInfo.businessHours, end: e.target.value }
                         }
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -433,7 +451,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                           webhook: { ...settings.integrations.webhook, url: e.target.value }
                         }
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       placeholder="https://seu-app.com/webhook"
                     />
                   </div>
@@ -452,7 +470,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                           webhook: { ...settings.integrations.webhook, secret: e.target.value }
                         }
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       placeholder="Sua chave secreta do webhook"
                     />
                   </div>
@@ -475,7 +493,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                           crm: { ...settings.integrations.crm, type: e.target.value }
                         }
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     >
                       <option value="none">Nenhum</option>
                       <option value="hubspot">HubSpot</option>
@@ -501,7 +519,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                               crm: { ...settings.integrations.crm, apiKey: e.target.value }
                             }
                           })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                         />
                       </div>
 
@@ -520,7 +538,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                                 crm: { ...settings.integrations.crm, endpoint: e.target.value }
                               }
                             })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                             placeholder="https://api.seu-crm.com/v1"
                           />
                         </div>
@@ -585,7 +603,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                       ...settings,
                       compliance: { ...settings.compliance, dataRetentionDays: parseInt(e.target.value) }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                   />
                 </div>
 
@@ -600,7 +618,7 @@ export function Settings({ connections, onSave, kohlConnections, selectedConnect
                       ...settings,
                       compliance: { ...settings.compliance, unsubscribeKeyword: e.target.value }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Usuários podem enviar esta palavra para parar de receber mensagens

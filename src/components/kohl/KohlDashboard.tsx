@@ -17,6 +17,7 @@ import { defaultMenuTemplate, kohlFAQs } from '../../data/kohl-courses';
 import { startSession as startWebSession } from '../../integrations/whatsapp/webSession';
 import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
+import { SectionErrorBoundary } from '../ui/StateViews';
 
 export function KohlDashboard() {
   const [activeSection, setActiveSection] = useState('connections');
@@ -202,9 +203,17 @@ export function KohlDashboard() {
   };
 
   const renderSection = () => {
+    const label = menuItems.find(m => m.id === activeSection)?.label ?? activeSection;
+
+    const wrap = (node: React.ReactNode) => (
+      <SectionErrorBoundary sectionName={label} onRetry={() => setActiveSection(activeSection)}>
+        {node}
+      </SectionErrorBoundary>
+    );
+
     switch (activeSection) {
       case 'connections':
-        return (
+        return wrap(
           <WhatsAppConnections
             connections={connections}
             onAddConnection={handleAddConnection}
@@ -214,7 +223,7 @@ export function KohlDashboard() {
           />
         );
       case 'ai':
-        return (
+        return wrap(
           <AIConfiguration
             config={aiConfigs[0]}
             onSave={handleSaveAIConfig}
@@ -223,14 +232,14 @@ export function KohlDashboard() {
           />
         );
       case 'menu':
-        return (
+        return wrap(
           <MenuBuilder
             menu={menus[0]}
             onSave={handleSaveMenu}
           />
         );
       case 'campaigns':
-        return (
+        return wrap(
           <CampaignManager
             campaigns={campaigns}
             connections={connections}
@@ -238,9 +247,9 @@ export function KohlDashboard() {
           />
         );
       case 'templates':
-        return <MessageTemplates />;
+        return wrap(<MessageTemplates />);
       case 'leads':
-        return (
+        return wrap(
           <LeadManager
             leads={leads}
             connections={connections}
@@ -248,20 +257,16 @@ export function KohlDashboard() {
           />
         );
       case 'analytics':
-        return (
-          <Analytics
-            connections={connections}
-          />
-        );
+        return wrap(<Analytics connections={connections} />);
       case 'status':
-        return (
+        return wrap(
           <SystemStatus
             clientId={authClientId}
             connectionId={selectedConnectionId || connections[0]?.id}
           />
         );
       case 'settings':
-        return (
+        return wrap(
           <Settings
             connections={[]}
             onSave={() => {}}
@@ -271,7 +276,11 @@ export function KohlDashboard() {
           />
         );
       default:
-        return null;
+        return (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-sm text-gray-500">Secao nao encontrada</p>
+          </div>
+        );
     }
   };
 

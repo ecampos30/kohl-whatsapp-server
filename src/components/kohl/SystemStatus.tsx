@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Activity, Wifi, WifiOff, Brain, AlertTriangle, CheckCircle, RefreshCw, Clock, Webhook } from 'lucide-react';
+import { Activity, Wifi, WifiOff, Brain, AlertTriangle, CheckCircle, RefreshCw, Clock, Webhook, Loader2 } from 'lucide-react';
 import { supabase, SystemLog } from '../../lib/supabase';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
@@ -47,6 +47,7 @@ export function SystemStatus({ clientId, connectionId }: SystemStatusProps) {
     testResult: 'idle',
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   const loadData = useCallback(async () => {
@@ -127,6 +128,7 @@ export function SystemStatus({ clientId, connectionId }: SystemStatusProps) {
 
     setLastRefresh(new Date());
     setIsRefreshing(false);
+    setInitialLoading(false);
   }, [clientId, connectionId]);
 
   useEffect(() => {
@@ -198,6 +200,37 @@ export function SystemStatus({ clientId, connectionId }: SystemStatusProps) {
     not_configured: { label: 'Nao configurada', color: 'text-yellow-600' },
     error: { label: 'Erro de conexao', color: 'text-red-600' },
   };
+
+  if (initialLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Status do Sistema</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Monitoramento em tempo real de todos os componentes</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 animate-pulse">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 bg-gray-200 rounded-lg" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-gray-200 rounded w-1/2" />
+                  <div className="h-2.5 bg-gray-100 rounded w-2/3" />
+                </div>
+              </div>
+              <div className="h-2.5 bg-gray-100 rounded w-3/4" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-center gap-2 text-sm text-gray-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Carregando logs do sistema...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -316,7 +349,7 @@ export function SystemStatus({ clientId, connectionId }: SystemStatusProps) {
             <button
               onClick={handleTestOpenAI}
               disabled={openAIStatus.testResult === 'testing' || !connectionId}
-              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition-colors disabled:opacity-50"
+              className="text-xs bg-gray-900 hover:bg-gray-800 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
             >
               Testar Conexao
             </button>

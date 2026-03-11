@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Save, TestTube, Brain, Shield, Plus, Trash2, Upload, AlertTriangle, CheckCircle, HelpCircle, Key, Loader } from 'lucide-react';
+import { SaveToast } from '../ui/StateViews';
 import { AIConfiguration as AIConfigType, FAQ, Document } from '../../types/kohl-system';
 import { supabase } from '../../lib/supabase';
 
@@ -29,6 +30,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
   const [keySaveResult, setKeySaveResult] = useState<{ success: boolean; message: string } | null>(null);
   const [keyTestStatus, setKeyTestStatus] = useState<KeyTestStatus>('idle');
   const [savedKeyLast4, setSavedKeyLast4] = useState(config.openaiApiKey ? config.openaiApiKey.slice(-4) : '');
+  const [saveToast, setSaveToast] = useState(false);
 
   const handleSave = async () => {
     const errors: Record<string, string> = {};
@@ -92,6 +94,8 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
     }
 
     onSave({ ...localConfig, openaiApiKey: newApiKey || localConfig.openaiApiKey });
+    setSaveToast(true);
+    setTimeout(() => setSaveToast(false), 3000);
   };
 
   const handleTestKey = async () => {
@@ -207,27 +211,29 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
 
   return (
     <div className="space-y-6">
+      <SaveToast visible={saveToast} message="Configuracao de IA salva" />
+
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Configuração de IA</h2>
-          <p className="text-gray-600">Configure o assistente virtual inteligente com OpenAI</p>
+          <h2 className="text-lg font-semibold text-gray-900">Configuracao de IA</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Configure o assistente virtual com OpenAI</p>
         </div>
-        
-        <div className="flex items-center space-x-3">
+
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowHelp(!showHelp)}
-            className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+            className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             title="Ajuda"
           >
-            <HelpCircle className="h-5 w-5" />
+            <HelpCircle className="h-4 w-4" />
           </button>
-          
+
           <button
             onClick={handleSave}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+            className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             <Save className="h-4 w-4" />
-            <span>Salvar Configuração</span>
+            Salvar
           </button>
         </div>
       </div>
@@ -256,7 +262,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                   onClick={() => setActiveTab(tab.id)}
                   className={`py-4 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
+                      ? 'border-rose-500 text-rose-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
