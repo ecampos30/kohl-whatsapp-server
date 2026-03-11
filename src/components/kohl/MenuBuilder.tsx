@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit3, Trash2, Save, Eye, MessageSquare } from 'lucide-react';
+import { Plus, CreditCard as Edit3, Trash2, Save, Eye, MessageSquare } from 'lucide-react';
 import { SaveToast } from '../ui/StateViews';
 import { MenuTemplate, MenuOption, CourseInfo } from '../../types/kohl-system';
 import { kohlCourses } from '../../data/kohl-courses';
