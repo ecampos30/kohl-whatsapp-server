@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Smartphone, Bot, LayoutList, Megaphone, MessageSquare, Users,
+  BarChart2, Activity, Settings as SettingsIcon, ChevronRight,
+} from 'lucide-react';
 import { WhatsAppConnections } from './WhatsAppConnections';
 import { AIConfiguration } from './AIConfiguration';
 import { MenuBuilder } from './MenuBuilder';
@@ -115,15 +119,15 @@ export function KohlDashboard() {
   }, []);
 
   const menuItems = [
-    { id: 'connections', label: 'Conexões WhatsApp', icon: '📱' },
-    { id: 'ai', label: 'Configuração de IA', icon: '🤖' },
-    { id: 'menu', label: 'Construtor de Menu', icon: '📋' },
-    { id: 'campaigns', label: 'Campanhas e Fluxos', icon: '📢' },
-    { id: 'templates', label: 'Templates de Msg', icon: '💬' },
-    { id: 'leads', label: 'Gestão de Leads', icon: '👥' },
-    { id: 'analytics', label: 'Relatórios', icon: '📊' },
-    { id: 'status', label: 'Status do Sistema', icon: '🔍' },
-    { id: 'settings', label: 'Configurações', icon: '⚙️' },
+    { id: 'connections', label: 'Conexões WhatsApp', icon: Smartphone },
+    { id: 'ai', label: 'Configuração de IA', icon: Bot },
+    { id: 'menu', label: 'Construtor de Menu', icon: LayoutList },
+    { id: 'campaigns', label: 'Campanhas e Fluxos', icon: Megaphone },
+    { id: 'templates', label: 'Templates de Msg', icon: MessageSquare },
+    { id: 'leads', label: 'Gestão de Leads', icon: Users },
+    { id: 'analytics', label: 'Relatórios', icon: BarChart2 },
+    { id: 'status', label: 'Status do Sistema', icon: Activity },
+    { id: 'settings', label: 'Configurações', icon: SettingsIcon },
   ];
 
   const handleAddConnection = () => {
@@ -271,77 +275,105 @@ export function KohlDashboard() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">K</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Kohl Bot Manager</h1>
-              <p className="text-gray-600">Sistema de Gerenciamento WhatsApp para Cursos de Beleza</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span>
-                {connections.filter(c => c.status === 'connected').length} de {connections.length} Conectado(s)
-              </span>
-            </div>
-            
-            <div className="text-sm text-gray-600">
-              {connections.filter(c => c.connectionType === 'web').length} Web QR • {' '}
-              {connections.filter(c => c.connectionType === 'api').length} Business API
-            </div>
+  const connectedCount = connections.filter(c => c.status === 'connected').length;
+  const activeItem = menuItems.find(m => m.id === activeSection);
 
-            {selectedConnectionId && (
-              <button
-                onClick={() => setActiveSection('settings')}
-                className="flex items-center space-x-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1.5 rounded-lg transition-colors"
-                title="Clique para trocar a sessao ativa"
-              >
-                <span className="font-medium">Enviando via:</span>
-                <span className="text-gray-900 font-semibold">
-                  {connections.find(c => c.id === selectedConnectionId)?.name ?? selectedConnectionId}
-                </span>
-              </button>
-            )}
-            
-            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-              <span className="text-gray-600 text-sm font-medium">A</span>
-            </div>
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Top header */}
+      <header className="bg-white border-b border-gray-200 h-14 flex items-center px-5 shrink-0 z-10">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 bg-rose-600 rounded-lg flex items-center justify-center shrink-0">
+            <span className="text-white font-bold text-sm tracking-tight">K</span>
+          </div>
+          <div className="hidden sm:block">
+            <span className="text-sm font-semibold text-gray-900">Kohl Bot Manager</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 ml-auto">
+          {/* Connection status pill */}
+          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+            connectedCount > 0
+              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-gray-100 text-gray-500 border border-gray-200'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${connectedCount > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+            {connectedCount}/{connections.length} online
+          </div>
+
+          {/* Type split */}
+          <div className="hidden md:flex items-center gap-1 text-xs text-gray-400 border-l border-gray-200 pl-2">
+            <span>{connections.filter(c => c.connectionType === 'web').length} Web</span>
+            <span>·</span>
+            <span>{connections.filter(c => c.connectionType === 'api').length} API</span>
+          </div>
+
+          {/* Active session pill */}
+          {selectedConnectionId && (
+            <button
+              onClick={() => setActiveSection('settings')}
+              className="hidden lg:inline-flex items-center gap-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1.5 rounded-lg transition-colors border border-gray-200"
+              title="Clique para trocar a sessao ativa"
+            >
+              <Smartphone className="h-3 w-3 text-gray-400" />
+              <span className="text-gray-500">Enviando via</span>
+              <span className="font-semibold text-gray-800">
+                {connections.find(c => c.id === selectedConnectionId)?.name ?? selectedConnectionId}
+              </span>
+            </button>
+          )}
+
+          {/* Avatar */}
+          <div className="w-7 h-7 bg-gray-200 rounded-full flex items-center justify-center ml-1">
+            <span className="text-gray-600 text-xs font-semibold">A</span>
           </div>
         </div>
       </header>
 
-      <div className="flex">
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-screen">
-          <nav className="p-4">
-            <div className="space-y-2">
-              {menuItems.map((item) => (
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-56 bg-white border-r border-gray-200 shrink-0 flex flex-col">
+          <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSection === item.id;
+              return (
                 <button
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all ${
-                    activeSection === item.id 
-                      ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-sm' 
-                      : 'text-gray-700 hover:bg-gray-100'
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors text-sm ${
+                    isActive
+                      ? 'bg-rose-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
                 >
-                  <span className="text-lg">{item.icon}</span>
-                  <span className="font-medium">{item.label}</span>
+                  <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                  <span className="font-medium truncate">{item.label}</span>
+                  {isActive && <ChevronRight className="h-3 w-3 ml-auto shrink-0 opacity-70" />}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </nav>
+
+          {/* Sidebar footer */}
+          <div className="px-3 py-3 border-t border-gray-100">
+            <p className="text-[10px] text-gray-400 leading-tight">Kohl Bot Manager</p>
+            <p className="text-[10px] text-gray-300">Sistema de Gerenciamento</p>
+          </div>
         </aside>
 
-        <main className="flex-1 p-6">
-          {renderSection()}
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto">
+          {/* Breadcrumb bar */}
+          <div className="bg-white border-b border-gray-100 px-6 py-2.5 flex items-center gap-2 text-xs text-gray-400">
+            <span>Painel</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-gray-700 font-medium">{activeItem?.label ?? 'Secao'}</span>
+          </div>
+          <div className="p-6">
+            {renderSection()}
+          </div>
         </main>
       </div>
     </div>

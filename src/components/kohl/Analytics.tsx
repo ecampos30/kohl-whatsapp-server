@@ -65,104 +65,67 @@ export function Analytics({ connections }: AnalyticsProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Analytics Dashboard</h2>
-          <p className="text-gray-600">Track performance and engagement metrics</p>
+          <h2 className="text-lg font-semibold text-gray-900">Relatorios e Metricas</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Acompanhe desempenho e engajamento</p>
         </div>
-        
-        <div className="flex items-center space-x-3">
+
+        <div className="flex items-center gap-2">
           <select
             value={selectedConnection}
             onChange={(e) => setSelectedConnection(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent"
           >
-            <option value="all">All Numbers</option>
+            <option value="all">Todos os numeros</option>
             {connections.map((conn) => (
-              <option key={conn.id} value={conn.id}>
-                {conn.name}
-              </option>
+              <option key={conn.id} value={conn.id}>{conn.name}</option>
             ))}
           </select>
-          
+
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:border-transparent"
           >
-            <option value="7days">Last 7 days</option>
-            <option value="30days">Last 30 days</option>
-            <option value="90days">Last 90 days</option>
+            <option value="7days">Ultimos 7 dias</option>
+            <option value="30days">Ultimos 30 dias</option>
+            <option value="90days">Ultimos 90 dias</option>
           </select>
-          
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors">
+
+          <button className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             <Download className="h-4 w-4" />
-            <span>Export</span>
+            Exportar
           </button>
         </div>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl p-6 border border-gray-200">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <MessageSquare className="h-6 w-6 text-blue-600" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { icon: MessageSquare, iconBg: 'bg-blue-50', iconColor: 'text-blue-600', label: 'Mensagens', sub: 'Total enviadas', value: mockData.messages.sent.toLocaleString(), trend: '+12%' },
+          { icon: Users, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', label: 'Novos Leads', sub: 'Neste periodo', value: mockData.leads.new, trend: '+8%' },
+          { icon: Target, iconBg: 'bg-amber-50', iconColor: 'text-amber-600', label: 'Taxa de Conv.', sub: 'Lead → Matricula', value: `${mockData.leads.conversionRate}%`, trend: '+2.1%' },
+          { icon: TrendingUp, iconBg: 'bg-rose-50', iconColor: 'text-rose-600', label: 'Satisfacao IA', sub: 'Nota media', value: `${mockData.aiPerformance.satisfaction}/5.0`, trend: '+0.3' },
+        ].map(({ icon: Icon, iconBg, iconColor, label, sub, value, trend }) => (
+          <div key={label} className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-8 h-8 ${iconBg} rounded-lg flex items-center justify-center shrink-0`}>
+                <Icon className={`h-4 w-4 ${iconColor}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-900 truncate">{label}</p>
+                <p className="text-xs text-gray-400">{sub}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-medium text-gray-900">Messages</h3>
-              <p className="text-sm text-gray-600">Total sent</p>
-            </div>
+            <div className="text-2xl font-semibold text-gray-900 mb-1">{value}</div>
+            <div className="text-xs text-emerald-600 font-medium">{trend} vs periodo anterior</div>
           </div>
-          <div className="text-2xl font-bold text-gray-900 mb-2">{mockData.messages.sent.toLocaleString()}</div>
-          <div className="text-sm text-green-600">+12% vs last period</div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 border border-gray-200">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-gray-900">New Leads</h3>
-              <p className="text-sm text-gray-600">This period</p>
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-gray-900 mb-2">{mockData.leads.new}</div>
-          <div className="text-sm text-green-600">+8% vs last period</div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 border border-gray-200">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Target className="h-6 w-6 text-purple-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-gray-900">Conversion Rate</h3>
-              <p className="text-sm text-gray-600">Lead to enrollment</p>
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-gray-900 mb-2">{mockData.leads.conversionRate}%</div>
-          <div className="text-sm text-green-600">+2.1% vs last period</div>
-        </div>
-
-        <div className="bg-white rounded-xl p-6 border border-gray-200">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-orange-600" />
-            </div>
-            <div>
-              <h3 className="font-medium text-gray-900">AI Satisfaction</h3>
-              <p className="text-sm text-gray-600">Average rating</p>
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-gray-900 mb-2">{mockData.aiPerformance.satisfaction}/5.0</div>
-          <div className="text-sm text-green-600">+0.3 vs last period</div>
-        </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Messages Chart */}
-        <div className="bg-white rounded-xl p-6 border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Atividade Diária</h3>
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Atividade Diaria</h3>
           
           <div className="flex items-end space-x-2 h-64 mb-4">
             {chartData.map((item, index) => (
@@ -203,8 +166,8 @@ export function Analytics({ connections }: AnalyticsProps) {
         </div>
 
         {/* Course Interest */}
-        <div className="bg-white rounded-xl p-6 border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Interesse por Cursos</h3>
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Interesse por Curso</h3>
           
           <div className="space-y-4">
             {Object.entries(mockData.courses.inquiries).map(([courseId, inquiries]) => {
@@ -224,7 +187,7 @@ export function Analytics({ connections }: AnalyticsProps) {
                   
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
-                      className="bg-gradient-to-r from-pink-500 to-purple-600 h-2 rounded-full"
+                      className="bg-rose-500 h-2 rounded-full"
                       style={{ width: `${(inquiries / Math.max(...Object.values(mockData.courses.inquiries))) * 100}%` }}
                     />
                   </div>
@@ -236,37 +199,22 @@ export function Analytics({ connections }: AnalyticsProps) {
       </div>
 
       {/* AI Performance */}
-      <div className="bg-white rounded-xl p-6 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-6">Performance do Assistente de IA</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-green-600 mb-2">{mockData.aiPerformance.handled}</div>
-            <div className="text-sm text-gray-600">Mensagens Atendidas</div>
-            <div className="text-xs text-gray-500 mt-1">
-              {((mockData.aiPerformance.handled / (mockData.aiPerformance.handled + mockData.aiPerformance.escalated)) * 100).toFixed(1)}% taxa de sucesso
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Performance do Assistente de IA</h3>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { value: mockData.aiPerformance.handled, label: 'Atendidas pela IA', sub: `${((mockData.aiPerformance.handled / (mockData.aiPerformance.handled + mockData.aiPerformance.escalated)) * 100).toFixed(1)}% de sucesso`, color: 'text-emerald-600' },
+            { value: mockData.aiPerformance.escalated, label: 'Escaladas', sub: `${((mockData.aiPerformance.escalated / (mockData.aiPerformance.handled + mockData.aiPerformance.escalated)) * 100).toFixed(1)}% do total`, color: 'text-amber-600' },
+            { value: mockData.aiPerformance.satisfaction, label: 'Satisfacao Media', sub: 'De 5.0 estrelas', color: 'text-blue-600' },
+            { value: `${mockData.aiPerformance.avgResponseTime}s`, label: 'Resposta Media', sub: 'Somente IA', color: 'text-gray-900' },
+          ].map(({ value, label, sub, color }) => (
+            <div key={label} className="border border-gray-100 rounded-lg p-4 text-center">
+              <div className={`text-2xl font-semibold ${color} mb-1`}>{value}</div>
+              <div className="text-xs font-medium text-gray-700">{label}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">{sub}</div>
             </div>
-          </div>
-          
-          <div className="text-center">
-            <div className="text-3xl font-bold text-orange-600 mb-2">{mockData.aiPerformance.escalated}</div>
-            <div className="text-sm text-gray-600">Escalado para Humano</div>
-            <div className="text-xs text-gray-500 mt-1">
-              {((mockData.aiPerformance.escalated / (mockData.aiPerformance.handled + mockData.aiPerformance.escalated)) * 100).toFixed(1)}% taxa de escalação
-            </div>
-          </div>
-          
-          <div className="text-center">
-            <div className="text-3xl font-bold text-blue-600 mb-2">{mockData.aiPerformance.satisfaction}</div>
-            <div className="text-sm text-gray-600">Satisfação Média</div>
-            <div className="text-xs text-gray-500 mt-1">De 5.0 estrelas</div>
-          </div>
-          
-          <div className="text-center">
-            <div className="text-3xl font-bold text-purple-600 mb-2">{mockData.aiPerformance.avgResponseTime}s</div>
-            <div className="text-sm text-gray-600">Tempo Médio de Resposta</div>
-            <div className="text-xs text-gray-500 mt-1">Apenas respostas da IA</div>
-          </div>
+          ))}
         </div>
       </div>
     </div>

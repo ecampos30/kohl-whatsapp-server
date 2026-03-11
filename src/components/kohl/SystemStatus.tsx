@@ -203,20 +203,21 @@ export function SystemStatus({ clientId, connectionId }: SystemStatusProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">Status do Sistema</h2>
-          <p className="text-gray-600">Monitoramento em tempo real de todos os componentes</p>
+          <h2 className="text-lg font-semibold text-gray-900">Status do Sistema</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Monitoramento em tempo real de todos os componentes</p>
         </div>
-        <div className="flex items-center space-x-3">
-          <span className="text-xs text-gray-500">
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">
             Atualizado: {lastRefresh.toLocaleTimeString('pt-BR')}
           </span>
           <button
             onClick={loadData}
             disabled={isRefreshing}
-            className="p-2 text-gray-500 hover:text-blue-600 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
             title="Atualizar"
           >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Atualizar
           </button>
         </div>
       </div>
