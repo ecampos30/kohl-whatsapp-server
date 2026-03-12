@@ -19,43 +19,52 @@ import { logger } from '../../lib/logger';
 import { supabase } from '../../lib/supabase';
 import { SectionErrorBoundary } from '../ui/StateViews';
 
+function dbRowToConnection(row: Record<string, unknown>): WhatsAppConnection {
+  return {
+    id: row.id as string,
+    name: row.display_name as string,
+    number: row.phone_number as string,
+    status: (row.status as WhatsAppConnection['status']) ?? 'disconnected',
+    lastActivity: (row.last_activity as string) ?? new Date().toISOString(),
+    messageCount: 0,
+    connectionType: (row.connection_type as string) === 'api_oficial' ? 'api' : 'web',
+    apiCredentials: row.api_credentials as WhatsAppConnection['apiCredentials'],
+  };
+}
+
 export function KohlDashboard() {
   const [activeSection, setActiveSection] = useState('connections');
   const [authClientId, setAuthClientId] = useState<string | undefined>(undefined);
+  const [connectionsLoaded, setConnectionsLoaded] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.id) {
-        setAuthClientId(data.user.id);
-      }
+    supabase.auth.getUser().then(async ({ data }) => {
+      const uid = data?.user?.id;
+      if (!uid) return;
+      await supabase.from('clients').upsert(
+        { id: uid, name: data.user?.email ?? '', email: data.user?.email ?? '' },
+        { onConflict: 'id', ignoreDuplicates: true }
+      );
+      setAuthClientId(uid);
     });
   }, []);
-  const [connections, setConnections] = useState<WhatsAppConnection[]>([
-    {
-      id: '1',
-      name: 'Kohl Comercial',
-      number: '+55 11 99999-0001',
-      status: 'disconnected',
-      lastActivity: new Date().toISOString(),
-      messageCount: 0,
-      connectionType: 'web',
-      apiCredentials: undefined
-    },
-    {
-      id: '2',
-      name: 'Kohl Suporte',
-      number: '+55 11 99999-0002',
-      status: 'disconnected',
-      lastActivity: new Date().toISOString(),
-      messageCount: 0,
-      connectionType: 'api',
-      apiCredentials: {
-        accessToken: 'EAA_demo_token_123',
-        phoneNumberId: '987654321',
-        businessAccountId: '123456789'
-      }
-    }
-  ]);
+
+  const [connections, setConnections] = useState<WhatsAppConnection[]>([]);
+
+  useEffect(() => {
+    if (!authClientId) return;
+    supabase
+      .from('whatsapp_connections')
+      .select('*')
+      .eq('client_id', authClientId)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setConnections(data.map(dbRowToConnection));
+        }
+        setConnectionsLoaded(true);
+      });
+  }, [authClientId]);
 
   const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([
     {
@@ -66,11 +75,11 @@ export function KohlDashboard() {
       persona: {
         tone: 'welcoming',
         language: 'pt-BR',
-        customInstructions: 'You are Kohl\'s AI assistant for beauty courses. Be helpful, professional, and always promote our courses when appropriate. Focus on eyebrow techniques, microblading, and beauty treatments.'
+        customInstructions: ''
       },
       scope: {
-        canHandle: ['Course Information', 'Pricing & Payment', 'Schedule & Dates'],
-        escalationTriggers: ['Complaint or negative feedback', 'Request to speak with human'],
+        canHandle: [],
+        escalationTriggers: [],
         maxTokens: 500,
         temperature: 0.7
       },
@@ -88,36 +97,19 @@ export function KohlDashboard() {
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string>(
-    () => localStorage.getItem('kohl_selected_connection') ?? connections[0]?.id ?? ''
-  );
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string>('');
+
+  useEffect(() => {
+    if (connections.length === 0) return;
+    const stored = localStorage.getItem('kohl_selected_connection');
+    const valid = stored && connections.find(c => c.id === stored);
+    setSelectedConnectionId(valid ? stored! : connections[0].id);
+  }, [connections]);
 
   const handleSelectConnection = (id: string) => {
     setSelectedConnectionId(id);
     localStorage.setItem('kohl_selected_connection', id);
   };
-
-  // Simular algumas conexões para demonstração
-  useEffect(() => {
-    // Simular mudanças de status das conexões
-    const interval = setInterval(() => {
-      setConnections(prevConnections => 
-        prevConnections.map(conn => {
-          // Simular atividade aleatória
-          if (Math.random() > 0.95) {
-            return {
-              ...conn,
-              messageCount: conn.messageCount + Math.floor(Math.random() * 3),
-              lastActivity: new Date().toISOString()
-            };
-          }
-          return conn;
-        })
-      );
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const menuItems = [
     { id: 'connections', label: 'Conexões WhatsApp', icon: Smartphone },
@@ -131,26 +123,41 @@ export function KohlDashboard() {
     { id: 'settings', label: 'Configurações', icon: SettingsIcon },
   ];
 
-  const handleAddConnection = () => {
-    const newConnection: WhatsAppConnection = {
-      id: Date.now().toString(),
-      name: `Kohl ${connections.length + 1}`,
-      number: `+55 11 99999-000${connections.length + 1}`,
-      status: 'disconnected',
-      lastActivity: new Date().toISOString(),
-      messageCount: 0,
-      connectionType: connections.length % 2 === 0 ? 'web' : 'api',
-      apiCredentials: connections.length % 2 === 1 ? {
-        access_token: '',
-        phone_number_id: '',
-        business_account_id: ''
-      } : undefined
-    };
-    setConnections([...connections, newConnection]);
+  const handleAddConnection = async () => {
+    if (!authClientId) return;
+    const { data, error } = await supabase
+      .from('whatsapp_connections')
+      .insert({
+        client_id: authClientId,
+        display_name: `Kohl ${connections.length + 1}`,
+        phone_number: '',
+        status: 'disconnected',
+        connection_type: 'web',
+        last_activity: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      setConnections(prev => [...prev, dbRowToConnection(data)]);
+    }
   };
 
-  const handleDeleteConnection = (id: string) => {
-    setConnections(connections.filter(conn => conn.id !== id));
+  const handleDeleteConnection = async (id: string) => {
+    await supabase.from('whatsapp_connections').delete().eq('id', id);
+    setConnections(prev => prev.filter(conn => conn.id !== id));
+    if (selectedConnectionId === id) {
+      const remaining = connections.filter(c => c.id !== id);
+      setSelectedConnectionId(remaining[0]?.id ?? '');
+    }
+  };
+
+  const updateConnectionStatus = async (id: string, status: WhatsAppConnection['status']) => {
+    setConnections(prev => prev.map(conn => conn.id === id ? { ...conn, status } : conn));
+    await supabase
+      .from('whatsapp_connections')
+      .update({ status, last_activity: new Date().toISOString() })
+      .eq('id', id);
   };
 
   const handleConfigureConnection = async (id: string) => {
@@ -160,11 +167,7 @@ export function KohlDashboard() {
     await logger.info('connection_configure', `Configurando conexão ${connection.name} (${connection.connectionType})`, { id });
 
     try {
-      setConnections(prev => prev.map(conn =>
-        conn.id === id
-          ? { ...conn, status: connection.connectionType === 'web' ? 'scanning' : 'disconnected' }
-          : conn
-      ));
+      await updateConnectionStatus(id, connection.connectionType === 'web' ? 'scanning' : 'disconnected');
 
       if (connection.connectionType === 'web') {
         const res = await startWebSession(id);
@@ -180,17 +183,17 @@ export function KohlDashboard() {
         const isValid = !!connection.apiCredentials?.accessToken;
 
         if (isValid) {
-          setConnections(prev => prev.map(conn => conn.id === id ? { ...conn, status: 'connected' } : conn));
+          await updateConnectionStatus(id, 'connected');
           await logger.info('session_connected', `Business API validada com sucesso para ${connection.name}`, { id });
         } else {
-          setConnections(prev => prev.map(conn => conn.id === id ? { ...conn, status: 'error' } : conn));
+          await updateConnectionStatus(id, 'error');
           await logger.error('session_error', `Falha na validação da API para ${connection.name}`, { id });
         }
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       await logger.error('session_error', `Erro ao configurar conexão: ${msg}`, { id });
-      setConnections(prev => prev.map(conn => conn.id === id ? { ...conn, status: 'error' } : conn));
+      await updateConnectionStatus(id, 'error');
     }
   };
 
