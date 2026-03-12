@@ -157,14 +157,14 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
     setIsTestingAI(false);
   };
 
-  const keyTestLabel: Record<KeyTestStatus, { label: string; color: string }> = {
-    idle: { label: 'Testar Chave', color: 'bg-gray-600 hover:bg-gray-700' },
-    testing: { label: 'Testando...', color: 'bg-gray-400' },
-    ok: { label: 'Chave OK', color: 'bg-green-600' },
-    invalid_key: { label: 'Chave Invalida', color: 'bg-red-600' },
-    quota_exceeded: { label: 'Cota Esgotada', color: 'bg-orange-600' },
-    not_configured: { label: 'Nao Configurada', color: 'bg-yellow-600' },
-    error: { label: 'Erro de Conexao', color: 'bg-red-600' },
+  const keyTestLabel: Record<KeyTestStatus, { label: string; cls: string }> = {
+    idle: { label: 'Testar chave', cls: 'bg-gray-900 hover:bg-gray-800' },
+    testing: { label: 'Testando...', cls: 'bg-gray-400' },
+    ok: { label: 'Chave valida', cls: 'bg-emerald-600' },
+    invalid_key: { label: 'Chave invalida', cls: 'bg-red-600' },
+    quota_exceeded: { label: 'Cota esgotada', cls: 'bg-amber-600' },
+    not_configured: { label: 'Nao configurada', cls: 'bg-amber-500' },
+    error: { label: 'Erro de conexao', cls: 'bg-red-600' },
   };
 
   const addFAQ = () => {
@@ -240,13 +240,13 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
 
       {/* Help Panel */}
       {showHelp && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-medium text-blue-900 mb-2">💡 Dicas de Configuração</h3>
-          <div className="text-sm text-blue-800 space-y-1">
-            <p><strong>Tokens:</strong> 150-500 para respostas concisas no WhatsApp</p>
-            <p><strong>Temperatura:</strong> 0.7 para equilíbrio entre criatividade e precisão</p>
-            <p><strong>Persona:</strong> Seja específico sobre tom, estilo e objetivos</p>
-            <p><strong>RAG:</strong> Adicione FAQs para respostas mais precisas</p>
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-800 mb-2">Dicas de Configuracao</h3>
+          <div className="text-xs text-gray-600 space-y-1.5">
+            <p><span className="font-medium text-gray-700">Tokens:</span> 150-500 para respostas concisas no WhatsApp</p>
+            <p><span className="font-medium text-gray-700">Temperatura:</span> 0.7 para equilibrio entre criatividade e precisao</p>
+            <p><span className="font-medium text-gray-700">Persona:</span> Seja especifico sobre tom, estilo e objetivos</p>
+            <p><span className="font-medium text-gray-700">FAQs:</span> Adicione perguntas frequentes para respostas mais precisas</p>
           </div>
         </div>
       )}
@@ -284,12 +284,12 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                   </label>
 
                   {savedKeyLast4 && !newApiKey && (
-                    <div className="flex items-center space-x-2 mb-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
-                      <Key className="h-4 w-4 text-green-600" />
-                      <span className="text-sm text-green-800">Chave configurada: sk-...{savedKeyLast4}</span>
+                    <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <Key className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />
+                      <span className="text-xs text-emerald-800 flex-1">Chave configurada: sk-...{savedKeyLast4}</span>
                       <button
                         onClick={() => setSavedKeyLast4('')}
-                        className="ml-auto text-xs text-gray-500 hover:text-red-600 underline"
+                        className="text-xs text-gray-500 hover:text-red-600 underline underline-offset-2"
                       >
                         Substituir
                       </button>
@@ -301,7 +301,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                       type="password"
                       value={newApiKey}
                       onChange={(e) => setNewApiKey(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent ${
                         validationErrors.openaiApiKey ? 'border-red-300' : 'border-gray-300'
                       }`}
                       placeholder="sk-..."
@@ -324,7 +324,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                     <button
                       onClick={handleTestKey}
                       disabled={keyTestStatus === 'testing' || (!savedKeyLast4 && !newApiKey)}
-                      className={`text-xs text-white px-3 py-1 rounded-lg flex items-center space-x-1 transition-colors disabled:opacity-50 ${keyTestLabel[keyTestStatus].color}`}
+                      className={`text-xs text-white px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50 ${keyTestLabel[keyTestStatus].cls}`}
                     >
                       {keyTestStatus === 'testing' && <Loader className="h-3 w-3 animate-spin" />}
                       <span>{keyTestLabel[keyTestStatus].label}</span>
@@ -340,7 +340,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                     <select
                       value={localConfig.model}
                       onChange={(e) => setLocalConfig({...localConfig, model: e.target.value as any})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     >
                       <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Rápido)</option>
                       <option value="gpt-4">GPT-4 (Preciso)</option>
@@ -358,7 +358,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                         ...localConfig,
                         persona: {...localConfig.persona, tone: e.target.value as any}
                       })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     >
                       <option value="cordial">Cordial</option>
                       <option value="objective">Objetivo</option>
@@ -379,7 +379,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                       persona: {...localConfig.persona, customInstructions: e.target.value}
                     })}
                     rows={6}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     placeholder="Você é a assistente virtual da Kohl, especializada em cursos de beleza. Seja prestativa, profissional e sempre promova nossos cursos quando apropriado..."
                   />
                 </div>
@@ -398,7 +398,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                         ...localConfig,
                         scope: {...localConfig.scope, maxTokens: parseInt(e.target.value)}
                       })}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent ${
                         validationErrors.maxTokens ? 'border-red-300' : 'border-gray-300'
                       }`}
                     />
@@ -421,7 +421,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                         ...localConfig,
                         scope: {...localConfig.scope, temperature: parseFloat(e.target.value)}
                       })}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent ${
                         validationErrors.temperature ? 'border-red-300' : 'border-gray-300'
                       }`}
                     />
@@ -439,7 +439,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                       min="5"
                       max="60"
                       value={30}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -447,8 +447,8 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
 
               <div className="space-y-6">
                 {/* Teste da IA */}
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <h3 className="font-medium text-gray-900 mb-3">🧪 Testar Assistente de IA</h3>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Testar Assistente de IA</h3>
                   
                   <div className="space-y-3">
                     <input
@@ -456,13 +456,13 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                       value={testMessage}
                       onChange={(e) => setTestMessage(e.target.value)}
                       placeholder="Pergunte sobre cursos, preços, horários..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     />
                     
                     <button
                       onClick={handleTestAI}
                       disabled={isTestingAI || !testMessage.trim()}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors disabled:opacity-50"
+                      className="w-full bg-gray-900 hover:bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-colors disabled:opacity-50"
                     >
                       <TestTube className="h-4 w-4" />
                       <span>{isTestingAI ? 'Testando...' : 'Testar Resposta'}</span>
@@ -476,34 +476,30 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                   </div>
                 </div>
 
-                {/* Status da Configuração */}
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
-                  <h4 className="font-medium text-green-800 mb-3">⚙️ Status da Configuração</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        {localConfig.openaiApiKey ? (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <AlertTriangle className="h-4 w-4 text-red-600" />
-                        )}
-                        <span className="text-gray-700">API Key OpenAI</span>
+                {/* Status da Configuracao */}
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-3">Status da Configuracao</h4>
+                  <div className="space-y-2">
+                    {[
+                      {
+                        ok: !!(localConfig.openaiApiKey || savedKeyLast4),
+                        label: 'API Key OpenAI',
+                        value: savedKeyLast4 ? `sk-...${savedKeyLast4}` : 'Nao configurada',
+                      },
+                      { ok: true, label: 'Modelo', value: localConfig.model },
+                      { ok: true, label: 'Tom', value: localConfig.persona.tone },
+                      { ok: true, label: 'FAQs', value: `${localConfig.ragKnowledgeBase.faqs.length} registradas` },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          {item.ok
+                            ? <CheckCircle className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                            : <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />}
+                          <span className="text-gray-600">{item.label}</span>
+                        </div>
+                        <span className="text-gray-500 font-medium">{item.value}</span>
                       </div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-gray-700">Modelo: {localConfig.model}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-gray-700">Tom: {localConfig.persona.tone}</span>
-                      </div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span className="text-gray-700">FAQs: {localConfig.ragKnowledgeBase.faqs.length}</span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -513,7 +509,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
           {activeTab === 'scope' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Tópicos que a IA Pode Atender</h3>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Topicos que a IA pode atender</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {[
                     'Informações sobre cursos',
@@ -548,7 +544,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
               </div>
 
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Gatilhos para Handoff Humano</h3>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Gatilhos para handoff humano</h3>
                 <div className="space-y-3">
                   {[
                     'Reclamação ou feedback negativo',
@@ -582,17 +578,17 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                 </div>
               </div>
 
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <AlertTriangle className="h-4 w-4 text-orange-600" />
-                  <span className="text-sm font-medium text-orange-800">Regras de Handoff</span>
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                  <span className="text-xs font-semibold text-gray-700">Regras de Handoff</span>
                 </div>
-                <div className="text-sm text-orange-700 space-y-1">
-                  <p>• Quando ativado, a conversa é transferida para um atendente humano</p>
-                  <p>• Cliente recebe: "Encaminhei ao atendente. Já te respondemos por aqui. 🙏"</p>
-                  <p>• Notificação é enviada via painel, email ou WhatsApp interno</p>
-                  <p>• Histórico da conversa é preservado para contexto</p>
-                </div>
+                <ul className="text-xs text-gray-600 space-y-1.5">
+                  <li>Quando ativado, a conversa e transferida para um atendente humano</li>
+                  <li>O cliente recebe uma mensagem de transicao automatica</li>
+                  <li>Notificacao e enviada via painel ou WhatsApp interno</li>
+                  <li>Historico da conversa e preservado para contexto</li>
+                </ul>
               </div>
             </div>
           )}
@@ -600,11 +596,11 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
           {activeTab === 'knowledge' && (
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Base de Conhecimento RAG</h3>
-                
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Base de Conhecimento RAG</h3>
+
                 {/* Adicionar FAQ */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                  <h4 className="font-medium text-gray-900 mb-3">Adicionar Nova FAQ</h4>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
+                  <h4 className="text-xs font-semibold text-gray-700 mb-3">Adicionar Nova FAQ</h4>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <input
@@ -612,14 +608,14 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                         placeholder="Pergunta"
                         value={newFAQ.question}
                         onChange={(e) => setNewFAQ({...newFAQ, question: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       />
                       <input
                         type="text"
                         placeholder="Categoria"
                         value={newFAQ.category}
                         onChange={(e) => setNewFAQ({...newFAQ, category: e.target.value})}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       />
                     </div>
                     
@@ -628,7 +624,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                       value={newFAQ.answer}
                       onChange={(e) => setNewFAQ({...newFAQ, answer: e.target.value})}
                       rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                     />
                     
                     <div className="flex items-center space-x-4">
@@ -637,14 +633,14 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                         placeholder="Tags (separadas por vírgula)"
                         value={newFAQ.tags}
                         onChange={(e) => setNewFAQ({...newFAQ, tags: e.target.value})}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                       />
                       <button
                         onClick={addFAQ}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+                        className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
                       >
                         <Plus className="h-4 w-4" />
-                        <span>Adicionar</span>
+                        Adicionar
                       </button>
                     </div>
                   </div>
@@ -653,10 +649,12 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                 {/* Lista de FAQs */}
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {localConfig.ragKnowledgeBase.faqs.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Upload className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p>Nenhuma FAQ adicionada ainda</p>
-                      <p className="text-sm">Adicione perguntas frequentes para melhorar as respostas da IA</p>
+                    <div className="text-center py-10 bg-white border border-dashed border-gray-200 rounded-xl">
+                      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <Upload className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-700">Nenhuma FAQ ainda</p>
+                      <p className="text-xs text-gray-400 mt-1">Adicione perguntas frequentes para melhorar as respostas da IA</p>
                     </div>
                   ) : (
                     localConfig.ragKnowledgeBase.faqs.map((faq) => (
@@ -664,7 +662,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center space-x-2 mb-2">
-                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-md font-medium">
                                 {faq.category}
                               </span>
                               <h5 className="font-medium text-gray-900">{faq.question}</h5>
@@ -694,15 +692,14 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
                 </div>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-900 mb-2">🧠 Como Funciona o RAG</h4>
-                <div className="text-sm text-blue-800 space-y-1">
-                  <p>• A IA busca informações relevantes na base de conhecimento</p>
-                  <p>• Usa busca semântica para encontrar conteúdo relacionado</p>
-                  <p>• Combina o conhecimento com a pergunta do cliente</p>
-                  <p>• Sempre cita a fonte quando usar informações da base</p>
-                  <p>• Confiança mínima configurada para escalação automática</p>
-                </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-gray-800 mb-2">Como funciona o RAG</h4>
+                <ul className="text-xs text-gray-600 space-y-1.5">
+                  <li>A IA busca informacoes relevantes na base de conhecimento</li>
+                  <li>Usa busca semantica para encontrar conteudo relacionado</li>
+                  <li>Combina o conhecimento com a pergunta do cliente</li>
+                  <li>Confianca minima configurada para escalacao automatica</li>
+                </ul>
               </div>
             </div>
           )}
