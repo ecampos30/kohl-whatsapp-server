@@ -66,10 +66,10 @@ export function KohlDashboard() {
       });
   }, [authClientId]);
 
-  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([
-    {
-      id: '1',
-      whatsappId: '1',
+  function buildDefaultAIConfig(connectionId: string): AIConfig {
+    return {
+      id: connectionId,
+      whatsappId: connectionId,
       openaiApiKey: '',
       model: 'gpt-3.5-turbo',
       persona: {
@@ -88,8 +88,47 @@ export function KohlDashboard() {
         documents: [],
         courseInfo: []
       }
-    }
-  ]);
+    };
+  }
+
+  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
+
+  useEffect(() => {
+    if (!selectedConnectionId || !authClientId) return;
+    supabase
+      .from('ai_configs')
+      .select('*')
+      .eq('connection_id', selectedConnectionId)
+      .eq('client_id', authClientId)
+      .maybeSingle()
+      .then(({ data }) => {
+        const config: AIConfig = data
+          ? {
+              id: data.connection_id,
+              whatsappId: data.connection_id,
+              openaiApiKey: data.openai_key_last4 ? `sk-...${data.openai_key_last4}` : '',
+              model: data.model ?? 'gpt-3.5-turbo',
+              persona: {
+                tone: 'welcoming',
+                language: 'pt-BR',
+                customInstructions: data.persona_instructions ?? ''
+              },
+              scope: {
+                canHandle: [],
+                escalationTriggers: data.escalation_triggers ?? [],
+                maxTokens: data.max_tokens ?? 500,
+                temperature: data.temperature ?? 0.7
+              },
+              ragKnowledgeBase: {
+                faqs: kohlFAQs,
+                documents: [],
+                courseInfo: []
+              }
+            }
+          : buildDefaultAIConfig(selectedConnectionId);
+        setAiConfigs([config]);
+      });
+  }, [selectedConnectionId, authClientId]);
 
   const [menus, setMenus] = useState<MenuTemplate[]>([
     { ...defaultMenuTemplate, whatsappId: '1' }
@@ -198,7 +237,7 @@ export function KohlDashboard() {
   };
 
   const handleSaveAIConfig = (config: AIConfig) => {
-    setAiConfigs(aiConfigs.map(c => c.id === config.id ? config : c));
+    setAiConfigs([config]);
   };
 
   const handleSaveMenu = (menu: MenuTemplate) => {
@@ -225,15 +264,21 @@ export function KohlDashboard() {
             clientId={authClientId}
           />
         );
-      case 'ai':
+      case 'ai': {
+        const effectiveConnectionId = selectedConnectionId || connections[0]?.id;
+        const aiConfig = aiConfigs.find(c => c.whatsappId === effectiveConnectionId)
+          ?? (effectiveConnectionId ? buildDefaultAIConfig(effectiveConnectionId) : undefined);
+        if (!aiConfig) return wrap(<div className="text-sm text-gray-500 py-8 text-center">Adicione uma conexão WhatsApp primeiro.</div>);
         return wrap(
           <AIConfiguration
-            config={aiConfigs[0]}
+            key={effectiveConnectionId}
+            config={aiConfig}
             onSave={handleSaveAIConfig}
-            connectionId={selectedConnectionId || connections[0]?.id}
+            connectionId={effectiveConnectionId}
             clientId={authClientId}
           />
         );
+      }
       case 'menu':
         return wrap(
           <MenuBuilder
