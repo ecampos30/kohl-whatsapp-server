@@ -16,6 +16,12 @@ const MONITORING_KEYWORDS = [
   "pix",
 ];
 
+const DEFAULT_MODEL = "gpt-3.5-turbo";
+const DEFAULT_MAX_TOKENS = 500;
+const DEFAULT_TEMPERATURE = 0.7;
+const DEFAULT_PERSONA =
+  "Você é um assistente útil no WhatsApp. Responda de forma natural, curta e clara. Use o contexto anterior quando fizer sentido.";
+
 interface HandoffEntry {
   paused: boolean;
   paused_at: string;
@@ -45,6 +51,28 @@ function detectKeywords(text: string): string[] {
   return MONITORING_KEYWORDS.filter((kw) => lower.includes(kw));
 }
 
+async function decryptApiKey(
+  supabase: ReturnType<typeof createClient>,
+  encryptedKey: string
+): Promise<string | null> {
+  try {
+    if (encryptedKey.startsWith("ENCRYPTED:")) {
+      return atob(encryptedKey.replace("ENCRYPTED:", ""));
+    }
+    const secret =
+      Deno.env.get("OPENAI_KEY_ENCRYPTION_SECRET") ??
+      "default-encryption-secret-change-me";
+    const { data, error } = await supabase.rpc("pgp_sym_decrypt_text", {
+      data: encryptedKey,
+      psw: secret,
+    });
+    if (error) return null;
+    return data as string;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   try {
     const body = await req.json();
@@ -53,6 +81,7 @@ serve(async (req) => {
 
     const remoteJid = body?.remoteJid || body?.from || "unknown";
     const text = (body?.text || "").trim();
+    const incomingConnectionId: string | null = body?.connectionId ?? null;
 
     if (!text) {
       return new Response(JSON.stringify({ reply: "" }), {
@@ -66,11 +95,17 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const { data: connection } = await supabase
+    const connectionQuery = supabase
       .from("whatsapp_connections")
-      .select("id, client_id")
-      .limit(1)
-      .maybeSingle();
+      .select("id, client_id");
+
+    if (incomingConnectionId) {
+      connectionQuery.eq("id", incomingConnectionId);
+    } else {
+      connectionQuery.limit(1);
+    }
+
+    const { data: connection } = await connectionQuery.maybeSingle();
 
     const connectionId = connection?.id ?? null;
     const clientId = connection?.client_id ?? null;
@@ -188,6 +223,51 @@ serve(async (req) => {
       }
     }
 
+    // ── Load AI configuration from ai_configs table ──────────────────────
+    let aiModel = DEFAULT_MODEL;
+    let aiMaxTokens = DEFAULT_MAX_TOKENS;
+    let aiTemperature = DEFAULT_TEMPERATURE;
+    let aiPersona = DEFAULT_PERSONA;
+    let openaiApiKey = Deno.env.get("OPENAI_API_KEY") ?? null;
+
+    if (connectionId) {
+      const { data: aiConfig } = await supabase
+        .from("ai_configs")
+        .select(
+          "openai_api_key_encrypted, model, max_tokens, temperature, persona_instructions, is_active"
+        )
+        .eq("connection_id", connectionId)
+        .maybeSingle();
+
+      if (aiConfig && aiConfig.is_active !== false) {
+        if (aiConfig.model) aiModel = aiConfig.model;
+        if (aiConfig.max_tokens) aiMaxTokens = aiConfig.max_tokens;
+        if (typeof aiConfig.temperature === "number")
+          aiTemperature = aiConfig.temperature;
+        if (aiConfig.persona_instructions?.trim())
+          aiPersona = aiConfig.persona_instructions.trim();
+
+        if (aiConfig.openai_api_key_encrypted) {
+          const decrypted = await decryptApiKey(
+            supabase,
+            aiConfig.openai_api_key_encrypted
+          );
+          if (decrypted) openaiApiKey = decrypted;
+        }
+      }
+    }
+
+    if (!openaiApiKey) {
+      console.error("No OpenAI API key available");
+      return new Response(
+        JSON.stringify({
+          reply: "Serviço temporariamente indisponível. Tente novamente em instantes.",
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    // ── Load conversation history from whatsapp_memory ────────────────────
     const { data: history, error: historyError } = await supabase
       .from("whatsapp_memory")
       .select("role, content")
@@ -200,46 +280,88 @@ serve(async (req) => {
     }
 
     const messages = [
-      {
-        role: "system",
-        content:
-          "Você é um assistente útil no WhatsApp. Responda de forma natural, curta e clara. Use o contexto anterior quando fizer sentido.",
-      },
+      { role: "system", content: aiPersona },
       ...((history || []).slice().reverse()),
-      {
-        role: "user",
-        content: text,
-      },
+      { role: "user", content: text },
     ];
+
+    // ── Call OpenAI ───────────────────────────────────────────────────────
+    console.log(`Calling OpenAI model=${aiModel} tokens=${aiMaxTokens} temp=${aiTemperature}`);
 
     const ai = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
+        Authorization: `Bearer ${openaiApiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4.1-mini",
+        model: aiModel,
         messages,
-        temperature: 0.7,
+        max_tokens: aiMaxTokens,
+        temperature: aiTemperature,
       }),
+      signal: AbortSignal.timeout(30000),
     });
 
-    const aiData = await ai.json();
+    if (!ai.ok) {
+      const errText = await ai.text();
+      console.error(`OpenAI error ${ai.status}: ${errText}`);
 
+      if (connectionId && clientId) {
+        await supabase.from("system_logs").insert({
+          client_id: clientId,
+          level: "ERROR",
+          event_type: "openai_call",
+          message: `OpenAI error for ${remoteJid}: HTTP ${ai.status}`,
+          payload: { connection_id: connectionId, status: ai.status },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({ reply: "Desculpe, tive um erro agora. Tente novamente." }),
+        { headers: { "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    const aiData = await ai.json();
     const reply =
       aiData?.choices?.[0]?.message?.content?.trim() ||
       "Desculpe, tive um erro agora.";
 
+    // ── Persist conversation to whatsapp_memory ───────────────────────────
     const { error: insertError } = await supabase
       .from("whatsapp_memory")
       .insert([
-        { remote_jid: remoteJid, role: "user", content: text },
-        { remote_jid: remoteJid, role: "assistant", content: reply },
+        {
+          remote_jid: remoteJid,
+          connection_id: connectionId ?? undefined,
+          role: "user",
+          content: text,
+        },
+        {
+          remote_jid: remoteJid,
+          connection_id: connectionId ?? undefined,
+          role: "assistant",
+          content: reply,
+        },
       ]);
 
     if (insertError) {
-      console.error("insert error", insertError.message);
+      console.error("memory insert error", insertError.message);
+    }
+
+    if (connectionId && clientId) {
+      await supabase.from("system_logs").insert({
+        client_id: clientId,
+        level: "INFO",
+        event_type: "openai_response",
+        message: `AI responded to ${remoteJid} via model ${aiModel}`,
+        payload: {
+          connection_id: connectionId,
+          model: aiModel,
+          reply_length: reply.length,
+        },
+      });
     }
 
     return new Response(JSON.stringify({ reply }), {
@@ -250,11 +372,10 @@ serve(async (req) => {
     console.error("fatal error", err);
 
     return new Response(
-      JSON.stringify({ reply: "Tive um erro agora. Tente novamente em instantes." }),
-      {
-        headers: { "Content-Type": "application/json" },
-        status: 200,
-      }
+      JSON.stringify({
+        reply: "Tive um erro agora. Tente novamente em instantes.",
+      }),
+      { headers: { "Content-Type": "application/json" }, status: 200 }
     );
   }
 });
