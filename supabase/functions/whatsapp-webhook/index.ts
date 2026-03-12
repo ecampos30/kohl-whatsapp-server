@@ -95,6 +95,9 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const DEFAULT_CONNECTION_ID = "00000000-0000-0000-0000-000000000002";
+    const DEFAULT_CLIENT_ID = "00000000-0000-0000-0000-000000000001";
+
     const connectionQuery = supabase
       .from("whatsapp_connections")
       .select("id, client_id");
@@ -107,8 +110,8 @@ serve(async (req) => {
 
     const { data: connection } = await connectionQuery.maybeSingle();
 
-    const connectionId = connection?.id ?? null;
-    const clientId = connection?.client_id ?? null;
+    const connectionId: string = connection?.id ?? DEFAULT_CONNECTION_ID;
+    const clientId: string = connection?.client_id ?? DEFAULT_CLIENT_ID;
 
     if (connectionId && clientId) {
       const normalized = text.toLowerCase().trim();
