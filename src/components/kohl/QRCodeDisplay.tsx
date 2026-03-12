@@ -56,20 +56,13 @@ export function QRCodeDisplay({ connectionId, onClose, onConnectionSuccess }: QR
       return;
     }
 
-    if (statusRes.status === 'scanning') {
+    if (statusRes.status === 'scanning' || statusRes.status === 'connecting' || !statusRes.status) {
       const qrRes = await getSessionQr(connectionId);
       if (qrRes.qr) {
         updateQrImage(qrRes.qr);
         updatePhase('scanning');
         return;
       }
-      if (phaseRef.current === 'loading' || phaseRef.current === 'connecting') {
-        updatePhase('connecting');
-      }
-      return;
-    }
-
-    if (statusRes.status === 'connecting' || !statusRes.status || statusRes.ok === false) {
       if (phaseRef.current === 'loading' || phaseRef.current === 'connecting') {
         updatePhase('connecting');
       }
