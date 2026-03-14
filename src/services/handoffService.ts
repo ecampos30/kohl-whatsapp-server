@@ -83,18 +83,3 @@ export function getHandoffLabel(entry: BotControlEntry | null): string {
     if (!entry) return 'Bot ativo';
     return entry.handoff_mode ? `Humano (ativado por ${entry.handoff_by})` : 'Bot ativo';
 }
-}
-    }
-        }
-      )
-  }
-)
-    }
-        }
-      )
-  }
-)
-}
-    }
-}
-}
