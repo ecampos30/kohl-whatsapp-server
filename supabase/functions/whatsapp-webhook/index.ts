@@ -53,7 +53,7 @@ serve(async (req) => {
 
     console.log("Mensagem recebida:", body);
 
-    const remoteJid = body?.remoteJid || body?.from || "unknown";
+            const remoteJid = body?.remote_jid || body?.remoteJid || body?.from || "unknown";
     const text = (body?.text || "").trim();
     const incomingConnectionId: string | null = body?.connectionId ?? null;
 
