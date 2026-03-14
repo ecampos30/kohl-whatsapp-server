@@ -1,105 +1,100 @@
 import { supabase } from '../lib/supabase';
 
-export interface HandoffEntry {
-  paused: boolean;
-  paused_at: string;
-  expires_at: string;
-  origin: 'panel' | 'whatsapp';
+// Schema real: public.kohl_bot_control
+// Campos: remote_jid (PK), handoff_mode (boolean), handoff_by (text), updated_at (text)
+
+export interface BotControlEntry {
+    remote_jid: string;
+    handoff_mode: boolean;
+    handoff_by: string;
+    updated_at: string;
 }
 
-export type HandoffMap = Record<string, HandoffEntry>;
+// Busca o registro de controle do bot para um contato
+export async function getBotControl(remoteJid: string): Promise<BotControlEntry | null> {
+    const { data, error } = await supabase
+      .from('kohl_bot_control')
+      .select('remote_jid, handoff_mode, handoff_by, updated_at')
+      .eq('remote_jid', remoteJid)
+      .maybeSingle();
 
-const HANDOFF_DURATION_MS = 60 * 60 * 1000;
-
-function parseHandoffMap(raw: string | null): HandoffMap {
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw) as HandoffMap;
-  } catch {
-    return {};
-  }
-}
-
-export async function getHandoffMap(connectionId: string): Promise<HandoffMap> {
-  const { data } = await supabase
-    .from('bot_controls')
-    .select('pause_reason')
-    .eq('connection_id', connectionId)
-    .maybeSingle();
-
-  return parseHandoffMap(data?.pause_reason ?? null);
-}
-
-export function isContactPausedInMap(map: HandoffMap, remoteJid: string): boolean {
-  const entry = map[remoteJid];
-  if (!entry || !entry.paused) return false;
-  return new Date(entry.expires_at) > new Date();
-}
-
-export async function isContactPaused(connectionId: string, remoteJid: string): Promise<boolean> {
-  const map = await getHandoffMap(connectionId);
-  return isContactPausedInMap(map, remoteJid);
-}
-
-async function writeHandoffMap(connectionId: string, clientId: string, map: HandoffMap): Promise<void> {
-  await supabase.from('bot_controls').upsert(
-    {
-      connection_id: connectionId,
-      client_id: clientId,
-      pause_reason: JSON.stringify(map),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'connection_id' }
-  );
-}
-
-export async function pauseContact(
-  connectionId: string,
-  clientId: string,
-  remoteJid: string,
-  origin: 'panel' | 'whatsapp'
-): Promise<void> {
-  const map = await getHandoffMap(connectionId);
-  const now = new Date();
-  map[remoteJid] = {
-    paused: true,
-    paused_at: now.toISOString(),
-    expires_at: new Date(now.getTime() + HANDOFF_DURATION_MS).toISOString(),
-    origin,
-  };
-  await writeHandoffMap(connectionId, clientId, map);
-}
-
-export async function resumeContact(
-  connectionId: string,
-  clientId: string,
-  remoteJid: string
-): Promise<void> {
-  const map = await getHandoffMap(connectionId);
-  delete map[remoteJid];
-  await writeHandoffMap(connectionId, clientId, map);
-}
-
-export async function clearExpiredEntries(connectionId: string, clientId: string): Promise<void> {
-  const map = await getHandoffMap(connectionId);
-  const now = new Date();
-  let changed = false;
-  for (const jid of Object.keys(map)) {
-    if (new Date(map[jid].expires_at) <= now) {
-      delete map[jid];
-      changed = true;
+    if (error) {
+          console.error('Erro ao buscar kohl_bot_control:', error.message);
+          return null;
     }
-  }
-  if (changed) {
-    await writeHandoffMap(connectionId, clientId, map);
-  }
+
+    return data ?? null;
 }
 
-export function getExpiryLabel(entry: HandoffEntry): string {
-  const exp = new Date(entry.expires_at);
-  const remaining = exp.getTime() - Date.now();
-  if (remaining <= 0) return 'Expirado';
-  const mins = Math.ceil(remaining / 60000);
-  if (mins < 60) return `Expira em ${mins} min`;
-  return `Expira às ${exp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+// Verifica se o contato está em modo humano (handoff ativo)
+export async function isContactInHandoff(remoteJid: string): Promise<boolean> {
+    const entry = await getBotControl(remoteJid);
+    return entry?.handoff_mode === true;
+}
+
+// Ativa o modo humano para um contato (#sair / #humano)
+export async function activateHandoff(
+    remoteJid: string,
+    handoffBy: string = 'panel'
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('kohl_bot_control')
+      .upsert(
+        {
+                  remote_jid: remoteJid,
+                  handoff_mode: true,
+                  handoff_by: handoffBy,
+                  updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'remote_jid' }
+            );
+
+    if (error) {
+          console.error('Erro ao ativar handoff:', error.message);
+          throw error;
+    }
+}
+
+// Desativa o modo humano para um contato (#bot)
+export async function deactivateHandoff(
+    remoteJid: string,
+    handoffBy: string = 'panel'
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('kohl_bot_control')
+      .upsert(
+        {
+                  remote_jid: remoteJid,
+                  handoff_mode: false,
+                  handoff_by: handoffBy,
+                  updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'remote_jid' }
+            );
+
+    if (error) {
+          console.error('Erro ao desativar handoff:', error.message);
+          throw error;
+    }
+}
+
+// Retorna label legível do status de handoff
+export function getHandoffLabel(entry: BotControlEntry | null): string {
+    if (!entry) return 'Bot ativo';
+    return entry.handoff_mode ? `Humano (ativado por ${entry.handoff_by})` : 'Bot ativo';
+}
+}
+    }
+        }
+      )
+  }
+)
+    }
+        }
+      )
+  }
+)
+}
+    }
+}
 }
