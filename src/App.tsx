@@ -22,9 +22,14 @@ function App() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setAuthState(data.session ? 'authenticated' : 'unauthenticated');
-    });
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        setAuthState(data.session ? 'authenticated' : 'unauthenticated');
+      })
+      .catch((err) => {
+        console.error('[Auth] getSession failed, forcing unauthenticated:', err);
+        setAuthState('unauthenticated');
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session: Session | null) => {
       setAuthState(session ? 'authenticated' : 'unauthenticated');
