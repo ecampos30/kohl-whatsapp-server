@@ -29,7 +29,7 @@ export function SessionSelector({ connections, selectedConnectionId, onSelect }:
   }, []);
 
   const getBaileysStatus = (connectionId: string): string | null => {
-    const s = baileysSession.find(s => s.id === connectionId);
+    const s = baileysSessions.find(s => s.id === connectionId);
     return s?.status ?? null;
   };
 
