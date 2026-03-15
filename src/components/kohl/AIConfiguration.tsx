@@ -16,9 +16,33 @@ interface AIConfigurationProps {
 
 type KeyTestStatus = 'idle' | 'testing' | 'ok' | 'invalid_key' | 'quota_exceeded' | 'not_configured' | 'error';
 
+function ensureCompleteConfig(config: AIConfigType): AIConfigType {
+  return {
+    ...config,
+    model: config.model ?? 'gpt-3.5-turbo',
+    openaiApiKey: config.openaiApiKey ?? '',
+    persona: {
+      tone: config.persona?.tone ?? 'welcoming',
+      language: config.persona?.language ?? 'pt-BR',
+      customInstructions: config.persona?.customInstructions ?? '',
+    },
+    scope: {
+      canHandle: config.scope?.canHandle ?? [],
+      escalationTriggers: config.scope?.escalationTriggers ?? [],
+      maxTokens: config.scope?.maxTokens ?? 500,
+      temperature: config.scope?.temperature ?? 0.7,
+    },
+    ragKnowledgeBase: {
+      faqs: config.ragKnowledgeBase?.faqs ?? [],
+      documents: config.ragKnowledgeBase?.documents ?? [],
+      courseInfo: config.ragKnowledgeBase?.courseInfo ?? [],
+    },
+  };
+}
+
 export function AIConfiguration({ config, onSave, connectionId, clientId }: AIConfigurationProps) {
   const [activeTab, setActiveTab] = useState('persona');
-  const [localConfig, setLocalConfig] = useState(config);
+  const [localConfig, setLocalConfig] = useState(() => ensureCompleteConfig(config));
   const [testMessage, setTestMessage] = useState('');
   const [testResponse, setTestResponse] = useState('');
   const [isTestingAI, setIsTestingAI] = useState(false);
@@ -29,7 +53,7 @@ export function AIConfiguration({ config, onSave, connectionId, clientId }: AICo
   const [isSavingKey, setIsSavingKey] = useState(false);
   const [keySaveResult, setKeySaveResult] = useState<{ success: boolean; message: string } | null>(null);
   const [keyTestStatus, setKeyTestStatus] = useState<KeyTestStatus>('idle');
-  const [savedKeyLast4, setSavedKeyLast4] = useState(config.openaiApiKey ? config.openaiApiKey.slice(-4) : '');
+  const [savedKeyLast4, setSavedKeyLast4] = useState(config?.openaiApiKey ? config.openaiApiKey.slice(-4) : '');
   const [saveToast, setSaveToast] = useState(false);
 
   const handleSave = async () => {
