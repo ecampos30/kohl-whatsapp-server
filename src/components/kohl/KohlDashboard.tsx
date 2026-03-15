@@ -91,6 +91,8 @@ export function KohlDashboard() {
     };
   }
 
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string>('');
+
   const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([]);
 
   useEffect(() => {
@@ -136,7 +138,6 @@ export function KohlDashboard() {
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string>('');
 
   useEffect(() => {
     if (connections.length === 0) return;
