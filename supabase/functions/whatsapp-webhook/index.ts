@@ -20,6 +20,136 @@ const DEFAULT_TEMPERATURE = 0.7;
 const DEFAULT_PERSONA =
   "Você é a assistente virtual da Kohl, escola especializada em cursos de micropigmentação e estética. Seu objetivo é informar sobre os cursos disponíveis (Microblading, Nanoblading, NanoLips, BB Glow, Camuflagem de Cicatrizes, Harmonização de Aréola, Nanoliner e outros), preços, datas, inscrições e formas de pagamento. Responda de forma cordial, direta e profissional. Quando o cliente demonstrar interesse em se inscrever ou pagar, incentive e oriente sobre os próximos passos. Se não souber a resposta exata, oriente o cliente a digitar #sair para falar com um atendente humano. Responda sempre em português.";
 
+// ── OpenClaw integration config ───────────────────────────────────────────────
+const OPENCLAW_REPLY_URL = "http://56.125.222.193:18789/webhook/reply";
+const OPENCLAW_TOKEN = "b628d0ba17085bcc4372098a0fc7d4e53bfc02e76634177c";
+
+/**
+ * Detects if the incoming request body originated from OpenClaw.
+ *
+ * OpenClaw payload format (assumed — adjust field names if different):
+ * {
+ *   source: "openclaw",          // identifier field (optional, used as hint)
+ *   phone: "5511999999999",      // sender phone number
+ *   message: "texto da mensagem", // message text
+ *   session_id: "abc123",        // OpenClaw session/conversation ID (optional)
+ *   // alternative field names that OpenClaw might use:
+ *   // from: "5511999999999"
+ *   // text: "texto da mensagem"
+ *   // body: "texto da mensagem"
+ *   // number: "5511999999999"
+ * }
+ *
+ * IMPORTANT: Adjust the field mapping below (`openclawPhone`, `openclawText`)
+ * once the exact OpenClaw payload format is confirmed.
+ */
+function parseOpenClawPayload(body: Record<string, unknown>): {
+  isOpenClaw: boolean;
+  remoteJid: string;
+  text: string;
+  sessionId: string | null;
+} | null {
+  const isOpenClaw =
+    body?.source === "openclaw" ||
+    // fallback: if body has `phone` OR `number` field (typical in OpenClaw payloads)
+    typeof body?.phone !== "undefined" ||
+    typeof body?.number !== "undefined";
+
+  if (!isOpenClaw) return null;
+
+  // Map OpenClaw fields to internal format
+  // TODO: confirm exact field names with OpenClaw documentation
+  const rawPhone =
+    (body?.phone as string) ||
+    (body?.number as string) ||
+    (body?.from as string) ||
+    "";
+
+  const rawText =
+    (body?.message as string) ||
+    (body?.text as string) ||
+    (body?.body as string) ||
+    "";
+
+  const sessionId =
+    (body?.session_id as string) ||
+    (body?.sessionId as string) ||
+    null;
+
+  const remoteJid = rawPhone.replace(/\D/g, "") + "@s.whatsapp.net";
+
+  return {
+    isOpenClaw: true,
+    remoteJid,
+    text: rawText.trim(),
+    sessionId,
+  };
+}
+
+async function sendOpenClawReply(
+  supabase: ReturnType<typeof createClient>,
+  clientId: string,
+  remoteJid: string,
+  reply: string,
+  sessionId: string | null
+): Promise<void> {
+  try {
+    // TODO: confirm exact reply payload format expected by OpenClaw
+    const payload: Record<string, unknown> = {
+      phone: remoteJid.replace("@s.whatsapp.net", ""),
+      message: reply,
+    };
+
+    if (sessionId) {
+      payload.session_id = sessionId;
+    }
+
+    const res = await fetch(OPENCLAW_REPLY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENCLAW_TOKEN}`,
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`OpenClaw reply error ${res.status}: ${errText}`);
+
+      await supabase.from("system_logs").insert({
+        client_id: clientId,
+        level: "ERROR",
+        event_type: "openclaw_reply_error",
+        message: `Failed to send reply to OpenClaw for ${remoteJid}: HTTP ${res.status}`,
+        payload: { remote_jid: remoteJid, status: res.status, error: errText },
+      });
+      return;
+    }
+
+    console.log(`OpenClaw reply sent successfully to ${remoteJid}`);
+
+    await supabase.from("system_logs").insert({
+      client_id: clientId,
+      level: "INFO",
+      event_type: "openclaw_reply_sent",
+      message: `Reply sent to OpenClaw for ${remoteJid}`,
+      payload: { remote_jid: remoteJid, reply_length: reply.length },
+    });
+  } catch (err) {
+    console.error("OpenClaw reply fetch failed:", err);
+
+    await supabase.from("system_logs").insert({
+      client_id: clientId,
+      level: "ERROR",
+      event_type: "openclaw_reply_error",
+      message: `Exception sending reply to OpenClaw for ${remoteJid}`,
+      payload: { remote_jid: remoteJid, error: String(err) },
+    });
+  }
+}
+
 function detectKeywords(text: string): string[] {
   const lower = text.toLowerCase();
   return MONITORING_KEYWORDS.filter((kw) => lower.includes(kw));
@@ -53,8 +183,20 @@ serve(async (req) => {
 
     console.log("Mensagem recebida:", body);
 
-            const remoteJid = body?.remote_jid || body?.remoteJid || body?.from || "unknown";
-    const text = (body?.text || "").trim();
+    // ── Detect and normalize OpenClaw payload ────────────────────────────
+    const openClawData = parseOpenClawPayload(body as Record<string, unknown>);
+    const isOpenClaw = openClawData !== null;
+
+    const remoteJid = isOpenClaw
+      ? openClawData!.remoteJid
+      : (body?.remote_jid || body?.remoteJid || body?.from || "unknown");
+
+    const text = isOpenClaw
+      ? openClawData!.text
+      : (body?.text || "").trim();
+
+    const openClawSessionId = isOpenClaw ? openClawData!.sessionId : null;
+
     const incomingConnectionId: string | null = body?.connectionId ?? null;
 
     if (!text) {
@@ -150,6 +292,7 @@ serve(async (req) => {
         payload: {
           handoff_active: true,
           keywords_detected: detectedKeywords,
+          source: isOpenClaw ? "openclaw" : "baileys",
         },
       });
 
@@ -294,8 +437,16 @@ serve(async (req) => {
         connection_id: connectionId,
         model: aiModel,
         reply_length: reply.length,
+        source: isOpenClaw ? "openclaw" : "baileys",
       },
     });
+
+    // ── Send reply back to OpenClaw (fire-and-forget, does not block response) ──
+    if (isOpenClaw) {
+      EdgeRuntime.waitUntil(
+        sendOpenClawReply(supabase, clientId, remoteJid, reply, openClawSessionId)
+      );
+    }
 
     return new Response(JSON.stringify({ reply }), {
       headers: { "Content-Type": "application/json" },
